@@ -5,6 +5,7 @@ import { openAiAssistant } from './aiAssistant.js';
 const REFERENCE = [
   { term: 'SELECT', desc: 'Выбирает столбцы, которые нужно получить из таблицы.' },
   { term: 'FROM', desc: 'Указывает таблицу, из которой берутся данные.' },
+  { term: 'DISTINCT', desc: 'Убирает повторяющиеся значения из результата: SELECT DISTINCT column FROM table.' },
   { term: 'WHERE', desc: 'Фильтрует строки по условию.' },
   { term: 'ORDER BY', desc: 'Сортирует результат. По умолчанию — по возрастанию, DESC — по убыванию.' },
   { term: 'LIMIT', desc: 'Ограничивает количество возвращаемых строк.' },
@@ -141,6 +142,28 @@ export function renderTaskView(container, task, { onSolved } = {}) {
     textarea.value = currentCode;
     textarea.addEventListener('input', () => { currentCode = textarea.value; });
 
+    const KEYWORDS = ['SELECT', 'FROM', 'WHERE', 'DISTINCT', 'ORDER BY', 'LIMIT', '*'];
+    const keywordBar = el('div', {
+      style: 'display:flex;gap:6px;padding:8px 12px;overflow-x:auto;background:var(--bg);border-top:1px solid var(--line);',
+    });
+    KEYWORDS.forEach((kw) => {
+      const chip = el('button', {
+        class: 'btn-ghost-sm',
+        style: 'flex-shrink:0;font-family:var(--font-mono);',
+        onclick: () => {
+          const start = textarea.selectionStart ?? textarea.value.length;
+          const end = textarea.selectionEnd ?? textarea.value.length;
+          const insert = kw + ' ';
+          textarea.value = textarea.value.slice(0, start) + insert + textarea.value.slice(end);
+          currentCode = textarea.value;
+          const pos = start + insert.length;
+          textarea.focus();
+          textarea.setSelectionRange(pos, pos);
+        },
+      }, kw);
+      keywordBar.appendChild(chip);
+    });
+
     const runResult = el('div');
 
     const runBtn = el('button', { class: 'btn-run' }, 'Запустить код');
@@ -211,7 +234,7 @@ export function renderTaskView(container, task, { onSolved } = {}) {
 
     const actions = el('div', { class: 'editor-actions' }, [runBtn, aiBtn, resetBtn]);
 
-    wrap.append(ioGrid, editorTabs, textarea, actions, runResult);
+    wrap.append(ioGrid, editorTabs, textarea, keywordBar, actions, runResult);
     return wrap;
   }
 

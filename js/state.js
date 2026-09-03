@@ -14,6 +14,7 @@ const defaultState = {
   hearts: null, // null = infinite for now (matches "бесконечность" seen in Coddy header)
   completedLessons: {}, // lessonId -> { accuracy, timeSec, coinsEarned, errors, completedAt }
   completedPractice: {}, // taskId -> { solvedAt, attempts }
+  lessonPhases: {}, // lessonId -> { theory:bool, quiz:bool, task:bool, errors:number }
   aiSettings: {
     mode: 'proxy', // 'proxy' | 'byok'
     proxyUrl: '',
@@ -92,6 +93,31 @@ export const Store = {
 
   isLessonDone(lessonId) {
     return !!state.completedLessons[lessonId];
+  },
+
+  getPhases(lessonId) {
+    return state.lessonPhases[lessonId] || { theory: false, quiz: false, task: false, errors: 0 };
+  },
+
+  markPhaseDone(lessonId, phase) {
+    const cur = state.lessonPhases[lessonId] || { theory: false, quiz: false, task: false, errors: 0 };
+    cur[phase] = true;
+    state.lessonPhases[lessonId] = cur;
+    save();
+  },
+
+  addPhaseErrors(lessonId, n) {
+    const cur = state.lessonPhases[lessonId] || { theory: false, quiz: false, task: false, errors: 0 };
+    cur.errors = (cur.errors || 0) + n;
+    state.lessonPhases[lessonId] = cur;
+    save();
+  },
+
+  resetPhaseErrors(lessonId) {
+    const cur = state.lessonPhases[lessonId] || { theory: false, quiz: false, task: false, errors: 0 };
+    cur.errors = 0;
+    state.lessonPhases[lessonId] = cur;
+    save();
   },
 
   completePracticeTask(taskId) {

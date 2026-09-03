@@ -98,6 +98,34 @@ export function openLesson(lesson, { onClose } = {}) {
       optionEls.forEach((b) => body.appendChild(b));
     }
 
+    if (q.type === 'findline') {
+      body.appendChild(el('div', { style: 'color:var(--text-faint);font-size:13px;margin:-8px 0 14px;' }, 'Нажмите на строку, чтобы выбрать её'));
+      const codeBox = el('div', { class: 'code-block', style: 'padding:0;overflow:hidden;' });
+      let answered = false;
+      q.lines.forEach((lineText, i) => {
+        const lineEl = el('div', {
+          style: 'padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--line);display:flex;gap:12px;',
+        }, [
+          el('span', { style: 'color:var(--text-faint);user-select:none;min-width:14px;' }, String(i + 1)),
+          el('span', {}, lineText),
+        ]);
+        lineEl.addEventListener('click', () => {
+          if (answered) return;
+          answered = true;
+          const isCorrect = i === q.errorLine;
+          if (!isCorrect) errors++;
+          else quizCorrectFirstTry++;
+          lineEl.style.background = isCorrect ? 'rgba(92,214,138,.18)' : 'rgba(239,111,108,.18)';
+          if (!isCorrect) {
+            [...codeBox.children][q.errorLine].style.background = 'rgba(92,214,138,.18)';
+          }
+          showFeedback(isCorrect, q.explanation);
+        });
+        codeBox.appendChild(lineEl);
+      });
+      body.appendChild(codeBox);
+    }
+
     if (q.type === 'truefalse') {
       const options = [['Истина', true], ['Ложь', false]];
       const row = el('div', { style: 'display:flex;gap:10px;' });
@@ -234,4 +262,252 @@ function htmlIcon(svg) {
   const span = el('span', { style: 'display:flex' });
   span.innerHTML = svg;
   return span;
+}
+
+// ---------------------------------------------------------------------------
+// Phase-based flow: theory / quiz / task open as separate path nodes.
+// Used by the zigzag path (see pathPage.js). Checkpoints still use the
+// combined openLesson() above.
+// ---------------------------------------------------------------------------
+
+function renderQuizQuestionInto(body, overlay, q, onAnswered) {
+  body.innerHTML = '';
+  body.appendChild(el('div', { class: 'quiz-q' }, q.question));
+
+  if (q.type === 'single') {
+    let selected = null;
+    const optionEls = q.options.map((opt, i) => {
+      const btn = el('button', { class: 'quiz-option' }, opt);
+      btn.addEventListener('click', () => {
+        if (selected != null) return;
+        selected = i;
+        optionEls[i].classList.add('selected');
+        const isCorrect = i === q.correctIndex;
+        optionEls[q.correctIndex].classList.add('correct');
+        if (!isCorrect) optionEls[i].classList.add('wrong');
+        onAnswered(isCorrect, q.explanation);
+      });
+      return btn;
+    });
+    optionEls.forEach((b) => body.appendChild(b));
+  }
+
+  if (q.type === 'findline') {
+    body.appendChild(el('div', { style: 'color:var(--text-faint);font-size:13px;margin:-8px 0 14px;' }, 'Нажмите на строку, чтобы выбрать её'));
+    const codeBox = el('div', { class: 'code-block', style: 'padding:0;overflow:hidden;' });
+    let answered = false;
+    q.lines.forEach((lineText, i) => {
+      const lineEl = el('div', {
+        style: 'padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--line);display:flex;gap:12px;',
+      }, [
+        el('span', { style: 'color:var(--text-faint);user-select:none;min-width:14px;' }, String(i + 1)),
+        el('span', {}, lineText),
+      ]);
+      lineEl.addEventListener('click', () => {
+        if (answered) return;
+        answered = true;
+        const isCorrect = i === q.errorLine;
+        lineEl.style.background = isCorrect ? 'rgba(92,214,138,.18)' : 'rgba(239,111,108,.18)';
+        if (!isCorrect) {
+          [...codeBox.children][q.errorLine].style.background = 'rgba(92,214,138,.18)';
+        }
+        onAnswered(isCorrect, q.explanation);
+      });
+      codeBox.appendChild(lineEl);
+    });
+    body.appendChild(codeBox);
+  }
+
+  if (q.type === 'truefalse') {
+    const options = [['Истина', true], ['Ложь', false]];
+    const row = el('div', { style: 'display:flex;gap:10px;' });
+    const optionEls = options.map(([label, val]) => {
+      const btn = el('button', { class: 'quiz-option', style: 'flex:1;text-align:center;' }, label);
+      btn.addEventListener('click', () => {
+        if (optionEls.some((b) => b.classList.contains('selected'))) return;
+        btn.classList.add('selected');
+        const isCorrect = val === q.correct;
+        const correctBtn = optionEls[options.findIndex(([, v]) => v === q.correct)];
+        correctBtn.classList.add('correct');
+        if (!isCorrect) btn.classList.add('wrong');
+        onAnswered(isCorrect, q.explanation);
+      });
+      return btn;
+    });
+    optionEls.forEach((b) => row.appendChild(b));
+    body.appendChild(row);
+  }
+
+  if (q.type === 'fillblank') {
+    const chosen = new Array(q.blanks.length).fill(null);
+    const preview = el('div', { class: 'blank-preview' });
+    const groups = el('div');
+
+    function renderPreview() {
+      preview.innerHTML = '';
+      preview.appendChild(document.createTextNode(q.template[0] || ''));
+      q.blanks.forEach((b, i) => {
+        const slot = el('span', { class: 'blank-slot' }, chosen[i] || '____');
+        preview.appendChild(slot);
+        preview.appendChild(document.createTextNode(q.template[i + 1] || ''));
+      });
+    }
+    renderPreview();
+    body.appendChild(preview);
+
+    let answered = false;
+    q.blanks.forEach((blank, bi) => {
+      const group = el('div', { class: 'blank-group' }, [
+        el('div', { class: 'blank-label' }, `Пропуск ${bi + 1}:`),
+      ]);
+      const optsRow = el('div', { class: 'blank-options' });
+      blank.options.forEach((opt) => {
+        const chip = el('button', { class: 'blank-chip' }, opt);
+        chip.addEventListener('click', () => {
+          if (answered) return;
+          chosen[bi] = opt;
+          [...optsRow.children].forEach((c) => c.classList.remove('selected'));
+          chip.classList.add('selected');
+          renderPreview();
+          if (chosen.every((c) => c != null)) submit();
+        });
+        optsRow.appendChild(chip);
+      });
+      group.appendChild(optsRow);
+      groups.appendChild(group);
+    });
+    body.appendChild(groups);
+
+    function submit() {
+      answered = true;
+      const allCorrect = q.blanks.every((b, i) => chosen[i] === b.correct);
+      onAnswered(allCorrect, q.explanation);
+    }
+  }
+}
+
+export function openLessonPhase(lesson, phase, { onClose } = {}) {
+  const overlay = el('div', { class: 'lesson-overlay' });
+  const progressFill = el('div', { class: 'lesson-progress-fill' });
+  const topbar = el('div', { class: 'lesson-topbar' }, [
+    el('button', { class: 'icon-btn', onclick: () => finish() }, htmlIcon(ICONS.close)),
+    el('div', { class: 'lesson-progress-track' }, progressFill),
+  ]);
+  const body = el('div', { class: 'lesson-body' });
+  const footer = el('div', { class: 'lesson-footer' });
+  overlay.append(topbar, body, footer);
+  document.body.appendChild(overlay);
+
+  function finish() {
+    overlay.remove();
+    if (onClose) onClose();
+  }
+
+  if (phase === 'theory') {
+    const slides = lesson.theory || [];
+    let i = 0;
+    function renderSlide() {
+      progressFill.style.width = `${Math.round(((i + 1) / slides.length) * 100)}%`;
+      body.innerHTML = '';
+      footer.innerHTML = '';
+      const slide = slides[i];
+      if (slide.type === 'table') {
+        if (slide.caption) body.appendChild(el('div', { class: 'table-caption', html: slide.caption }));
+        const table = el('table', { class: 'data-table' });
+        table.appendChild(el('thead', {}, el('tr', {}, slide.columns.map((c) => el('th', {}, c)))));
+        const tbody = el('tbody');
+        slide.rows.forEach((r) => tbody.appendChild(el('tr', {}, r.map((v) => el('td', {}, String(v))))));
+        table.appendChild(tbody);
+        body.appendChild(table);
+      } else {
+        body.appendChild(el('div', { class: 'theory-text', html: slide.html }));
+        if (slide.code) body.appendChild(el('div', { class: 'code-block' }, slide.code));
+      }
+      const isLast = i === slides.length - 1;
+      footer.appendChild(el('button', {
+        class: 'btn-primary',
+        onclick: () => {
+          if (isLast) {
+            Store.markPhaseDone(lesson.id, 'theory');
+            finish();
+          } else {
+            i++;
+            renderSlide();
+          }
+        },
+      }, isLast ? 'Завершить' : (i === 0 ? 'Начать' : 'Далее')));
+    }
+    renderSlide();
+    return;
+  }
+
+  if (phase === 'quiz') {
+    const questions = lesson.quiz || [];
+    let i = 0;
+    let localErrors = 0;
+    function renderQ() {
+      progressFill.style.width = `${Math.round((i / questions.length) * 100)}%`;
+      renderQuizQuestionInto(body, overlay, questions[i], (isCorrect, explanation) => {
+        if (!isCorrect) localErrors++;
+        const sheet = el('div', { class: `feedback-sheet ${isCorrect ? 'correct' : 'wrong'}` });
+        sheet.append(
+          el('div', { class: `feedback-head ${isCorrect ? 'correct' : 'wrong'}` }, isCorrect ? '✓ Правильно!' : '✕ Неправильно'),
+          el('div', { class: 'feedback-text' }, explanation || ''),
+          el('button', {
+            class: 'btn-primary',
+            onclick: () => {
+              sheet.remove();
+              i++;
+              if (i >= questions.length) {
+                Store.addPhaseErrors(lesson.id, localErrors);
+                Store.markPhaseDone(lesson.id, 'quiz');
+                finish();
+              } else {
+                renderQ();
+              }
+            },
+          }, 'Продолжить')
+        );
+        overlay.appendChild(sheet);
+      });
+    }
+    footer.innerHTML = '';
+    renderQ();
+    return;
+  }
+
+  if (phase === 'task') {
+    body.style.padding = '0';
+    const wrap = el('div');
+    body.appendChild(wrap);
+    progressFill.style.width = '100%';
+    renderTaskView(wrap, lesson.task, {
+      onSolved: (taskErrors) => {
+        const prevErrors = Store.getPhases(lesson.id).errors || 0;
+        const totalErrors = prevErrors + taskErrors;
+        Store.markPhaseDone(lesson.id, 'task');
+        const coins = coinsForErrors(totalErrors);
+        const totalGraded = (lesson.quiz ? lesson.quiz.length : 0) + 1;
+        const accuracy = Math.max(0, Math.round(((totalGraded - Math.min(totalErrors, totalGraded)) / totalGraded) * 100));
+        Store.completeLesson(lesson.id, { accuracy, timeSec: 0, errors: totalErrors, coinsEarned: coins });
+        Store.resetPhaseErrors(lesson.id);
+
+        body.innerHTML = '';
+        body.style.padding = '';
+        footer.innerHTML = '';
+        body.appendChild(el('div', { class: 'complete-wrap' }, [
+          el('div', { class: 'complete-emoji' }, '🎉'),
+          el('div', { class: 'complete-title' }, 'Урок завершён!'),
+          el('div', { class: 'complete-stats' }, [
+            el('div', { class: 'complete-stat' }, [
+              el('div', { class: 'lbl' }, 'Точность'),
+              el('div', { class: 'val' }, `${accuracy}%`),
+            ]),
+          ]),
+          el('div', { class: 'coin-banner' }, [htmlIcon(ICONS.coin), `+${coins} монет`]),
+        ]));
+        footer.appendChild(el('button', { class: 'btn-primary', onclick: finish }, 'Продолжить'));
+      },
+    });
+  }
 }
