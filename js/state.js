@@ -1,7 +1,15 @@
 // Central app state, persisted to localStorage.
-// Keeps: profile info, coins, streak, completed lessons/tasks, per-lesson best results.
+// Keeps: profile info, coins/rubies, streak, completed lessons/tasks,
+// daily missions, shop inventory + equipped cosmetics, settings.
 
 const STORAGE_KEY = 'querypath_state_v1';
+export const STATE_VERSION = 2; // bump to force any future migration logic
+
+const DAILY_MISSION_DEFS = [
+  { id: 'm-lesson', title: 'Пройдите 1 урок на Пути', track: 'lessons', target: 1, reward: 10 },
+  { id: 'm-practice', title: 'Решите 2 задачи в Практике', track: 'practice', target: 2, reward: 10 },
+  { id: 'm-coins', title: 'Заработайте 20 монет', track: 'coins', target: 20, reward: 15 },
+];
 
 const defaultState = {
   profile: {
@@ -9,6 +17,7 @@ const defaultState = {
     joined: Date.now(),
   },
   coins: 0,
+  rubies: 0,
   streak: 0,
   lastActiveDay: null, // 'YYYY-MM-DD'
   hearts: null, // null = infinite for now (matches "бесконечность" seen in Coddy header)
@@ -20,6 +29,18 @@ const defaultState = {
     proxyUrl: '',
     apiKey: '',
   },
+  settings: {
+    confirmAnswers: true, // require a "Подтвердить" tap before grading a quiz answer
+  },
+  missions: {
+    date: null,
+    progress: { lessons: 0, practice: 0, coins: 0 },
+    claimed: {}, // missionId -> true
+  },
+  inventory: {
+    owned: ['avatar-1', 'avatar-2', 'avatar-3', 'avatar-4', 'avatar-5', 'avatar-6', 'frame-none', 'theme-dark', 'theme-light'],
+    equipped: { avatar: 'avatar-1', frame: 'frame-none', theme: 'theme-dark' },
+  },
 };
 
 function loadState() {
@@ -27,7 +48,16 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return structuredClone(defaultState);
     const parsed = JSON.parse(raw);
-    return { ...structuredClone(defaultState), ...parsed };
+    const merged = { ...structuredClone(defaultState), ...parsed };
+    // deep-merge nested objects that might be missing new sub-keys after an update
+    merged.aiSettings = { ...defaultState.aiSettings, ...(parsed.aiSettings || {}) };
+    merged.settings = { ...defaultState.settings, ...(parsed.settings || {}) };
+    merged.missions = { ...structuredClone(defaultState.missions), ...(parsed.missions || {}) };
+    merged.inventory = {
+      owned: (parsed.inventory && parsed.inventory.owned) ? Array.from(new Set([...defaultState.inventory.owned, ...parsed.inventory.owned])) : [...defaultState.inventory.owned],
+      equipped: { ...defaultState.inventory.equipped, ...((parsed.inventory && parsed.inventory.equipped) || {}) },
+    };
+    return merged;
   } catch (e) {
     console.warn('State load failed, resetting', e);
     return structuredClone(defaultState);
@@ -44,9 +74,22 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function ensureDailyMissionsFresh() {
+  const today = todayStr();
+  if (state.missions.date !== today) {
+    state.missions = { date: today, progress: { lessons: 0, practice: 0, coins: 0 }, claimed: {} };
+    save();
+  }
+}
+
 export const Store = {
   get() {
+    ensureDailyMissionsFresh();
     return state;
+  },
+
+  getMissionDefs() {
+    return DAILY_MISSION_DEFS;
   },
 
   touchStreak() {
@@ -65,7 +108,9 @@ export const Store = {
   },
 
   addCoins(n) {
+    ensureDailyMissionsFresh();
     state.coins += n;
+    state.missions.progress.coins += n;
     save();
   },
 
@@ -76,8 +121,22 @@ export const Store = {
     return true;
   },
 
+  addRubies(n) {
+    state.rubies += n;
+    save();
+  },
+
+  spendRubies(n) {
+    if (state.rubies < n) return false;
+    state.rubies -= n;
+    save();
+    return true;
+  },
+
   completeLesson(lessonId, { accuracy, timeSec, errors, coinsEarned }) {
+    ensureDailyMissionsFresh();
     const prev = state.completedLessons[lessonId];
+    const isNew = !prev;
     state.completedLessons[lessonId] = {
       accuracy,
       timeSec,
@@ -88,6 +147,7 @@ export const Store = {
     };
     this.addCoins(coinsEarned);
     this.touchStreak();
+    if (isNew) state.missions.progress.lessons += 1;
     save();
   },
 
@@ -121,16 +181,31 @@ export const Store = {
   },
 
   completePracticeTask(taskId) {
+    ensureDailyMissionsFresh();
     const prev = state.completedPractice[taskId] || { attempts: 0 };
+    const isNew = !state.completedPractice[taskId];
     state.completedPractice[taskId] = {
       solvedAt: Date.now(),
       attempts: prev.attempts + 1,
     };
+    if (isNew) state.missions.progress.practice += 1;
     save();
   },
 
   isPracticeDone(taskId) {
     return !!state.completedPractice[taskId];
+  },
+
+  claimMission(missionId) {
+    ensureDailyMissionsFresh();
+    const def = DAILY_MISSION_DEFS.find((m) => m.id === missionId);
+    if (!def) return false;
+    if (state.missions.claimed[missionId]) return false;
+    if ((state.missions.progress[def.track] || 0) < def.target) return false;
+    state.missions.claimed[missionId] = true;
+    this.addRubies(def.reward);
+    save();
+    return true;
   },
 
   setProfileName(name) {
@@ -141,6 +216,36 @@ export const Store = {
   setAiSettings(patch) {
     state.aiSettings = { ...state.aiSettings, ...patch };
     save();
+  },
+
+  setSettings(patch) {
+    state.settings = { ...state.settings, ...patch };
+    save();
+  },
+
+  // --- Shop / inventory ---
+  ownsItem(itemId) {
+    return state.inventory.owned.includes(itemId);
+  },
+
+  buyItem(item) {
+    if (this.ownsItem(item.id)) return { ok: false, reason: 'owned' };
+    const spend = item.currency === 'rubies' ? this.spendRubies(item.price) : this.spendCoins(item.price);
+    if (!spend) return { ok: false, reason: 'funds' };
+    state.inventory.owned.push(item.id);
+    save();
+    return { ok: true };
+  },
+
+  equipItem(item) {
+    if (!this.ownsItem(item.id)) return false;
+    state.inventory.equipped[item.category] = item.id;
+    save();
+    return true;
+  },
+
+  getEquipped() {
+    return state.inventory.equipped;
   },
 
   reset() {

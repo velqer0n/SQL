@@ -8,6 +8,42 @@ function coinsForErrors(errors) {
   return 5;
 }
 
+// Groups theory slides into 1-3 screens based on total content length, so a
+// short theory block shows in full on one screen (single closing tap), while
+// a long one is split into roughly even parts instead of forcing a tap after
+// every single slide.
+function slideWeight(slide) {
+  if (slide.type === 'table') return 90 + slide.rows.length * 20;
+  return (slide.html ? slide.html.length : 0) + (slide.code ? slide.code.length * 1.2 : 0);
+}
+
+function chunkTheorySlides(slides) {
+  if (!slides.length) return [[]];
+  const totalWeight = slides.reduce((sum, s) => sum + slideWeight(s), 0);
+  let pageCount = 1;
+  if (totalWeight > 1100 || slides.length > 6) pageCount = 3;
+  else if (totalWeight > 550 || slides.length > 3) pageCount = 2;
+  pageCount = Math.min(pageCount, slides.length);
+
+  const targetPerPage = totalWeight / pageCount;
+  const pages = [];
+  let current = [];
+  let currentWeight = 0;
+  slides.forEach((slide, idx) => {
+    current.push(slide);
+    currentWeight += slideWeight(slide);
+    const remainingSlides = slides.length - idx - 1;
+    const remainingPages = pageCount - pages.length - 1;
+    if (currentWeight >= targetPerPage && remainingPages > 0 && remainingSlides >= remainingPages) {
+      pages.push(current);
+      current = [];
+      currentWeight = 0;
+    }
+  });
+  if (current.length) pages.push(current);
+  return pages;
+}
+
 export function openLesson(lesson, { onClose } = {}) {
   const startTime = Date.now();
   let errors = 0;
@@ -76,126 +112,13 @@ export function openLesson(lesson, { onClose } = {}) {
   }
 
   function renderQuiz(q) {
-    body.appendChild(el('div', { class: 'quiz-q' }, q.question));
-
-    if (q.type === 'single') {
-      let selected = null;
-      const optionEls = q.options.map((opt, i) => {
-        const btn = el('button', { class: 'quiz-option' }, opt);
-        btn.addEventListener('click', () => {
-          if (selected != null) return;
-          selected = i;
-          optionEls[i].classList.add('selected');
-          const isCorrect = i === q.correctIndex;
-          if (!isCorrect) errors++;
-          else quizCorrectFirstTry++;
-          optionEls[q.correctIndex].classList.add('correct');
-          if (!isCorrect) optionEls[i].classList.add('wrong');
-          showFeedback(isCorrect, q.explanation);
-        });
-        return btn;
-      });
-      optionEls.forEach((b) => body.appendChild(b));
-    }
-
-    if (q.type === 'findline') {
-      body.appendChild(el('div', { style: 'color:var(--text-faint);font-size:13px;margin:-8px 0 14px;' }, 'Нажмите на строку, чтобы выбрать её'));
-      const codeBox = el('div', { class: 'code-block', style: 'padding:0;overflow:hidden;' });
-      let answered = false;
-      q.lines.forEach((lineText, i) => {
-        const lineEl = el('div', {
-          style: 'padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--line);display:flex;gap:12px;',
-        }, [
-          el('span', { style: 'color:var(--text-faint);user-select:none;min-width:14px;' }, String(i + 1)),
-          el('span', {}, lineText),
-        ]);
-        lineEl.addEventListener('click', () => {
-          if (answered) return;
-          answered = true;
-          const isCorrect = i === q.errorLine;
-          if (!isCorrect) errors++;
-          else quizCorrectFirstTry++;
-          lineEl.style.background = isCorrect ? 'rgba(92,214,138,.18)' : 'rgba(239,111,108,.18)';
-          if (!isCorrect) {
-            [...codeBox.children][q.errorLine].style.background = 'rgba(92,214,138,.18)';
-          }
-          showFeedback(isCorrect, q.explanation);
-        });
-        codeBox.appendChild(lineEl);
-      });
-      body.appendChild(codeBox);
-    }
-
-    if (q.type === 'truefalse') {
-      const options = [['Истина', true], ['Ложь', false]];
-      const row = el('div', { style: 'display:flex;gap:10px;' });
-      const optionEls = options.map(([label, val]) => {
-        const btn = el('button', { class: 'quiz-option', style: 'flex:1;text-align:center;' }, label);
-        btn.addEventListener('click', () => {
-          if (optionEls.some((b) => b.classList.contains('selected'))) return;
-          btn.classList.add('selected');
-          const isCorrect = val === q.correct;
-          if (!isCorrect) errors++;
-          else quizCorrectFirstTry++;
-          const correctBtn = optionEls[options.findIndex(([, v]) => v === q.correct)];
-          correctBtn.classList.add('correct');
-          if (!isCorrect) btn.classList.add('wrong');
-          showFeedback(isCorrect, q.explanation);
-        });
-        return btn;
-      });
-      optionEls.forEach((b) => row.appendChild(b));
-      body.appendChild(row);
-    }
-
-    if (q.type === 'fillblank') {
-      const chosen = new Array(q.blanks.length).fill(null);
-      const preview = el('div', { class: 'blank-preview' });
-      const groups = el('div');
-
-      function renderPreview() {
-        preview.innerHTML = '';
-        preview.appendChild(document.createTextNode(q.template[0] || ''));
-        q.blanks.forEach((b, i) => {
-          const slot = el('span', { class: 'blank-slot' }, chosen[i] || '____');
-          preview.appendChild(slot);
-          preview.appendChild(document.createTextNode(q.template[i + 1] || ''));
-        });
-      }
-      renderPreview();
-      body.appendChild(preview);
-
-      let answered = false;
-      q.blanks.forEach((blank, bi) => {
-        const group = el('div', { class: 'blank-group' }, [
-          el('div', { class: 'blank-label' }, `Пропуск ${bi + 1}:`),
-        ]);
-        const optsRow = el('div', { class: 'blank-options' });
-        blank.options.forEach((opt) => {
-          const chip = el('button', { class: 'blank-chip' }, opt);
-          chip.addEventListener('click', () => {
-            if (answered) return;
-            chosen[bi] = opt;
-            [...optsRow.children].forEach((c) => c.classList.remove('selected'));
-            chip.classList.add('selected');
-            renderPreview();
-            if (chosen.every((c) => c != null)) submitFillBlank();
-          });
-          optsRow.appendChild(chip);
-        });
-        group.appendChild(optsRow);
-        groups.appendChild(group);
-      });
-      body.appendChild(groups);
-
-      function submitFillBlank() {
-        answered = true;
-        const allCorrect = q.blanks.every((b, i) => chosen[i] === b.correct);
-        if (!allCorrect) errors++;
-        else quizCorrectFirstTry++;
-        showFeedback(allCorrect, q.explanation);
-      }
-    }
+    const confirmRequired = Store.get().settings.confirmAnswers;
+    renderQuizQuestionInto(body, footer, q, confirmRequired, (isCorrect, explanation) => {
+      if (!isCorrect) errors++;
+      else quizCorrectFirstTry++;
+      footer.innerHTML = '';
+      showFeedback(isCorrect, explanation);
+    });
   }
 
   function showFeedback(isCorrect, explanation) {
@@ -270,32 +193,68 @@ function htmlIcon(svg) {
 // combined openLesson() above.
 // ---------------------------------------------------------------------------
 
-function renderQuizQuestionInto(body, overlay, q, onAnswered) {
+function renderQuizQuestionInto(body, footer, q, confirmRequired, onAnswered) {
   body.innerHTML = '';
+  footer.innerHTML = '';
   body.appendChild(el('div', { class: 'quiz-q' }, q.question));
+
+  function showConfirmButton() {
+    const btn = el('button', { class: 'btn-primary' }, 'Подтвердить');
+    btn.disabled = true;
+    footer.appendChild(btn);
+    return {
+      enable: () => { btn.disabled = false; },
+      onClick: (fn) => btn.addEventListener('click', fn),
+    };
+  }
 
   if (q.type === 'single') {
     let selected = null;
+    let answered = false;
+    let confirmCtl = null;
     const optionEls = q.options.map((opt, i) => {
       const btn = el('button', { class: 'quiz-option' }, opt);
       btn.addEventListener('click', () => {
-        if (selected != null) return;
-        selected = i;
-        optionEls[i].classList.add('selected');
-        const isCorrect = i === q.correctIndex;
-        optionEls[q.correctIndex].classList.add('correct');
-        if (!isCorrect) optionEls[i].classList.add('wrong');
-        onAnswered(isCorrect, q.explanation);
+        if (answered) return;
+        if (!confirmRequired) {
+          answered = true;
+          selected = i;
+          optionEls[i].classList.add('selected');
+          const isCorrect = i === q.correctIndex;
+          optionEls[q.correctIndex].classList.add('correct');
+          if (!isCorrect) optionEls[i].classList.add('wrong');
+          onAnswered(isCorrect, q.explanation);
+        } else {
+          selected = i;
+          optionEls.forEach((b) => b.classList.remove('selected'));
+          btn.classList.add('selected');
+          confirmCtl.enable();
+        }
       });
       return btn;
     });
     optionEls.forEach((b) => body.appendChild(b));
+
+    if (confirmRequired) {
+      confirmCtl = showConfirmButton();
+      confirmCtl.onClick(() => {
+        if (selected == null || answered) return;
+        answered = true;
+        const isCorrect = selected === q.correctIndex;
+        optionEls[q.correctIndex].classList.add('correct');
+        if (!isCorrect) optionEls[selected].classList.add('wrong');
+        onAnswered(isCorrect, q.explanation);
+      });
+    }
   }
 
   if (q.type === 'findline') {
     body.appendChild(el('div', { style: 'color:var(--text-faint);font-size:13px;margin:-8px 0 14px;' }, 'Нажмите на строку, чтобы выбрать её'));
     const codeBox = el('div', { class: 'code-block', style: 'padding:0;overflow:hidden;' });
     let answered = false;
+    let selected = null;
+    let confirmCtl = null;
+    const lineEls = [];
     q.lines.forEach((lineText, i) => {
       const lineEl = el('div', {
         style: 'padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--line);display:flex;gap:12px;',
@@ -305,37 +264,80 @@ function renderQuizQuestionInto(body, overlay, q, onAnswered) {
       ]);
       lineEl.addEventListener('click', () => {
         if (answered) return;
-        answered = true;
-        const isCorrect = i === q.errorLine;
-        lineEl.style.background = isCorrect ? 'rgba(92,214,138,.18)' : 'rgba(239,111,108,.18)';
-        if (!isCorrect) {
-          [...codeBox.children][q.errorLine].style.background = 'rgba(92,214,138,.18)';
+        if (!confirmRequired) {
+          answered = true;
+          const isCorrect = i === q.errorLine;
+          lineEl.style.background = isCorrect ? 'rgba(92,214,138,.18)' : 'rgba(239,111,108,.18)';
+          if (!isCorrect) lineEls[q.errorLine].style.background = 'rgba(92,214,138,.18)';
+          onAnswered(isCorrect, q.explanation);
+        } else {
+          selected = i;
+          lineEls.forEach((el2) => { el2.style.outline = ''; });
+          lineEl.style.outline = '2px solid var(--teal)';
+          confirmCtl.enable();
         }
-        onAnswered(isCorrect, q.explanation);
       });
+      lineEls.push(lineEl);
       codeBox.appendChild(lineEl);
     });
     body.appendChild(codeBox);
+
+    if (confirmRequired) {
+      confirmCtl = showConfirmButton();
+      confirmCtl.onClick(() => {
+        if (selected == null || answered) return;
+        answered = true;
+        lineEls.forEach((el2) => { el2.style.outline = ''; });
+        const isCorrect = selected === q.errorLine;
+        lineEls[selected].style.background = isCorrect ? 'rgba(92,214,138,.18)' : 'rgba(239,111,108,.18)';
+        if (!isCorrect) lineEls[q.errorLine].style.background = 'rgba(92,214,138,.18)';
+        onAnswered(isCorrect, q.explanation);
+      });
+    }
   }
 
   if (q.type === 'truefalse') {
     const options = [['Истина', true], ['Ложь', false]];
+    let selected = null;
+    let answered = false;
+    let confirmCtl = null;
     const row = el('div', { style: 'display:flex;gap:10px;' });
     const optionEls = options.map(([label, val]) => {
       const btn = el('button', { class: 'quiz-option', style: 'flex:1;text-align:center;' }, label);
       btn.addEventListener('click', () => {
-        if (optionEls.some((b) => b.classList.contains('selected'))) return;
-        btn.classList.add('selected');
-        const isCorrect = val === q.correct;
-        const correctBtn = optionEls[options.findIndex(([, v]) => v === q.correct)];
-        correctBtn.classList.add('correct');
-        if (!isCorrect) btn.classList.add('wrong');
-        onAnswered(isCorrect, q.explanation);
+        if (answered) return;
+        if (!confirmRequired) {
+          answered = true;
+          btn.classList.add('selected');
+          const isCorrect = val === q.correct;
+          const correctBtn = optionEls[options.findIndex(([, v]) => v === q.correct)];
+          correctBtn.classList.add('correct');
+          if (!isCorrect) btn.classList.add('wrong');
+          onAnswered(isCorrect, q.explanation);
+        } else {
+          selected = val;
+          optionEls.forEach((b) => b.classList.remove('selected'));
+          btn.classList.add('selected');
+          confirmCtl.enable();
+        }
       });
       return btn;
     });
     optionEls.forEach((b) => row.appendChild(b));
     body.appendChild(row);
+
+    if (confirmRequired) {
+      confirmCtl = showConfirmButton();
+      confirmCtl.onClick(() => {
+        if (selected == null || answered) return;
+        answered = true;
+        const isCorrect = selected === q.correct;
+        const correctBtn = optionEls[options.findIndex(([, v]) => v === q.correct)];
+        correctBtn.classList.add('correct');
+        if (!isCorrect) optionEls[options.findIndex(([, v]) => v === selected)].classList.add('wrong');
+        onAnswered(isCorrect, q.explanation);
+      });
+    }
   }
 
   if (q.type === 'fillblank') {
@@ -356,6 +358,16 @@ function renderQuizQuestionInto(body, overlay, q, onAnswered) {
     body.appendChild(preview);
 
     let answered = false;
+    let confirmCtl = null;
+    if (confirmRequired) confirmCtl = showConfirmButton();
+
+    function trySubmit() {
+      if (chosen.every((c) => c != null)) {
+        if (confirmRequired) confirmCtl.enable();
+        else submit();
+      }
+    }
+
     q.blanks.forEach((blank, bi) => {
       const group = el('div', { class: 'blank-group' }, [
         el('div', { class: 'blank-label' }, `Пропуск ${bi + 1}:`),
@@ -369,7 +381,7 @@ function renderQuizQuestionInto(body, overlay, q, onAnswered) {
           [...optsRow.children].forEach((c) => c.classList.remove('selected'));
           chip.classList.add('selected');
           renderPreview();
-          if (chosen.every((c) => c != null)) submit();
+          trySubmit();
         });
         optsRow.appendChild(chip);
       });
@@ -377,6 +389,10 @@ function renderQuizQuestionInto(body, overlay, q, onAnswered) {
       groups.appendChild(group);
     });
     body.appendChild(groups);
+
+    if (confirmRequired) {
+      confirmCtl.onClick(() => { if (!answered) submit(); });
+    }
 
     function submit() {
       answered = true;
@@ -404,26 +420,27 @@ export function openLessonPhase(lesson, phase, { onClose } = {}) {
   }
 
   if (phase === 'theory') {
-    const slides = lesson.theory || [];
+    const pages = chunkTheorySlides(lesson.theory || []);
     let i = 0;
-    function renderSlide() {
-      progressFill.style.width = `${Math.round(((i + 1) / slides.length) * 100)}%`;
+    function renderPage() {
+      progressFill.style.width = `${Math.round(((i + 1) / pages.length) * 100)}%`;
       body.innerHTML = '';
       footer.innerHTML = '';
-      const slide = slides[i];
-      if (slide.type === 'table') {
-        if (slide.caption) body.appendChild(el('div', { class: 'table-caption', html: slide.caption }));
-        const table = el('table', { class: 'data-table' });
-        table.appendChild(el('thead', {}, el('tr', {}, slide.columns.map((c) => el('th', {}, c)))));
-        const tbody = el('tbody');
-        slide.rows.forEach((r) => tbody.appendChild(el('tr', {}, r.map((v) => el('td', {}, String(v))))));
-        table.appendChild(tbody);
-        body.appendChild(table);
-      } else {
-        body.appendChild(el('div', { class: 'theory-text', html: slide.html }));
-        if (slide.code) body.appendChild(el('div', { class: 'code-block' }, slide.code));
-      }
-      const isLast = i === slides.length - 1;
+      pages[i].forEach((slide) => {
+        if (slide.type === 'table') {
+          if (slide.caption) body.appendChild(el('div', { class: 'table-caption', html: slide.caption }));
+          const table = el('table', { class: 'data-table' });
+          table.appendChild(el('thead', {}, el('tr', {}, slide.columns.map((c) => el('th', {}, c)))));
+          const tbody = el('tbody');
+          slide.rows.forEach((r) => tbody.appendChild(el('tr', {}, r.map((v) => el('td', {}, String(v))))));
+          table.appendChild(tbody);
+          body.appendChild(table);
+        } else {
+          body.appendChild(el('div', { class: 'theory-text', html: slide.html }));
+          if (slide.code) body.appendChild(el('div', { class: 'code-block' }, slide.code));
+        }
+      });
+      const isLast = i === pages.length - 1;
       footer.appendChild(el('button', {
         class: 'btn-primary',
         onclick: () => {
@@ -432,23 +449,25 @@ export function openLessonPhase(lesson, phase, { onClose } = {}) {
             finish();
           } else {
             i++;
-            renderSlide();
+            renderPage();
           }
         },
       }, isLast ? 'Завершить' : (i === 0 ? 'Начать' : 'Далее')));
     }
-    renderSlide();
+    renderPage();
     return;
   }
 
   if (phase === 'quiz') {
     const questions = lesson.quiz || [];
+    const confirmRequired = Store.get().settings.confirmAnswers;
     let i = 0;
     let localErrors = 0;
     function renderQ() {
       progressFill.style.width = `${Math.round((i / questions.length) * 100)}%`;
-      renderQuizQuestionInto(body, overlay, questions[i], (isCorrect, explanation) => {
+      renderQuizQuestionInto(body, footer, questions[i], confirmRequired, (isCorrect, explanation) => {
         if (!isCorrect) localErrors++;
+        footer.innerHTML = '';
         const sheet = el('div', { class: `feedback-sheet ${isCorrect ? 'correct' : 'wrong'}` });
         sheet.append(
           el('div', { class: `feedback-head ${isCorrect ? 'correct' : 'wrong'}` }, isCorrect ? '✓ Правильно!' : '✕ Неправильно'),
@@ -471,7 +490,6 @@ export function openLessonPhase(lesson, phase, { onClose } = {}) {
         overlay.appendChild(sheet);
       });
     }
-    footer.innerHTML = '';
     renderQ();
     return;
   }

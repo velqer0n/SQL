@@ -7,6 +7,7 @@ export function renderTopbar() {
     el('div', { class: 'stat-group' }, [
       el('div', { class: 'stat-pill', style: 'color:var(--coral)' }, [htmlIcon(ICONS.flame), String(s.streak)]),
       el('div', { class: 'stat-pill', style: 'color:var(--amber)' }, [htmlIcon(ICONS.coin), String(s.coins)]),
+      el('div', { class: 'stat-pill', style: 'color:#e0546b' }, [htmlIcon(ICONS.ruby), String(s.rubies)]),
     ]),
     el('div', { class: 'stat-pill', style: 'color:var(--text-faint);font-weight:700;font-size:13px;' }, '∞ ♥'),
   ]);

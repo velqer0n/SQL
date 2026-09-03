@@ -1,6 +1,9 @@
 import { renderPathPage } from './pathPage.js';
 import { renderPracticePage } from './practicePage.js';
 import { renderProfilePage } from './profilePage.js';
+import { applyTheme } from './theme.js';
+
+applyTheme();
 
 const app = document.getElementById('app');
 const navButtons = document.querySelectorAll('.nav-btn');
