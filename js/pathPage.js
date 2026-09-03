@@ -21,11 +21,9 @@ function htmlIcon(svg) {
   return span;
 }
 
-function miniNode({ phase, locked, done, current, onClick }) {
+function miniNode({ phase, done, onClick }) {
   const classes = ['hex-btn', 'hex-btn-sm'];
-  if (done) classes.push('done');
-  else if (locked) classes.push('locked');
-  else if (current) classes.push('current');
+  classes.push(done ? 'done' : 'open');
   const btn = el('button', { class: classes.join(' ') }, htmlIcon(PHASE_ICON[phase]));
   btn.addEventListener('click', onClick);
   return el('div', { style: 'display:flex;flex-direction:column;align-items:center;gap:4px;' }, [
@@ -53,7 +51,6 @@ export function renderPathPage(container) {
 
     let rowParity = 0; // 0 = LTR, 1 = RTL
     let lastModule = null;
-    let firstIncompleteFound = false;
     let lastRowSide = null; // 'left' | 'right' | null
 
     function isLessonFullyDone(lesson) {
@@ -61,17 +58,16 @@ export function renderPathPage(container) {
     }
 
     chapters.forEach((lesson, idx) => {
-      const prevLesson = idx > 0 ? chapters[idx - 1] : null;
-      const prevDone = !prevLesson || isLessonFullyDone(prevLesson);
-
-      // module divider
+      // module divider — bold, teal, flanked by rule lines for visual weight
       if (lesson.module && lesson.module !== lastModule) {
         if (lastModule !== null) {
           wrap.appendChild(el('div', { class: 'path-connector' }));
-          wrap.appendChild(el('div', {
-            style: 'color:var(--text-faint);font-weight:700;font-size:13px;text-align:center;margin:10px 0;letter-spacing:.02em;',
-          }, lesson.module));
         }
+        wrap.appendChild(el('div', { class: 'module-divider' }, [
+          el('span', { class: 'module-divider-line' }),
+          el('span', { class: 'module-divider-text' }, lesson.module),
+          el('span', { class: 'module-divider-line' }),
+        ]));
         lastModule = lesson.module;
         rowParity = 0;
         lastRowSide = null;
@@ -79,9 +75,6 @@ export function renderPathPage(container) {
 
       if (lesson.kind === 'checkpoint') {
         const done = isLessonFullyDone(lesson);
-        const locked = !prevDone && !done;
-        const isCurrent = !done && !locked && !firstIncompleteFound;
-        if (isCurrent) firstIncompleteFound = true;
 
         if (lastRowSide) {
           wrap.appendChild(el('div', { class: `zigzag-conn-outer ${lastRowSide}` }, el('div', { class: `zigzag-conn ${done ? 'done' : ''}` })));
@@ -90,17 +83,14 @@ export function renderPathPage(container) {
         }
 
         const classes = ['hex-btn', 'checkpoint'];
-        if (done) classes.push('done');
-        else if (locked) classes.push('locked');
-        else if (isCurrent) classes.push('current');
+        classes.push(done ? 'done' : 'open');
         const btn = el('button', { class: classes.join(' ') }, htmlIcon(ICONS.trophy));
         btn.addEventListener('click', () => {
-          if (locked) return;
           openLesson(lesson, { onClose: () => renderPathPage(container) });
         });
         wrap.appendChild(el('div', { style: 'display:flex;flex-direction:column;align-items:center;gap:6px;' }, [
           btn,
-          el('div', { style: 'font-size:11.5px;color:var(--text-faint);font-weight:600;text-align:center;' }, lesson.title),
+          el('div', { class: 'lesson-row-title checkpoint-title' }, lesson.title),
         ]));
         rowParity = 0;
         lastRowSide = null;
@@ -115,52 +105,40 @@ export function renderPathPage(container) {
         btn.addEventListener('click', () => alert(`Глава «${lesson.title}» пока не наполнена контентом.`));
         wrap.appendChild(el('div', { style: 'display:flex;flex-direction:column;align-items:center;gap:6px;' }, [
           btn,
-          el('div', { style: 'font-size:11.5px;color:var(--text-faint);font-weight:600;text-align:center;' }, lesson.title),
+          el('div', { class: 'lesson-row-title' }, lesson.title),
         ]));
         lastRowSide = null;
         return;
       }
 
-      // regular 3-phase lesson
+      // regular 3-phase lesson — all phases always open, only 'done' differs
       const phases = state.lessonPhases[lesson.id] || { theory: false, quiz: false, task: false };
-      const theoryLocked = !prevDone;
-      const quizLocked = !phases.theory;
-      const taskLocked = !phases.quiz;
-
       const nodeDefs = [
-        { phase: 'theory', locked: theoryLocked, done: phases.theory },
-        { phase: 'quiz', locked: quizLocked, done: phases.quiz },
-        { phase: 'task', locked: taskLocked, done: phases.task },
+        { phase: 'theory', done: phases.theory },
+        { phase: 'quiz', done: phases.quiz },
+        { phase: 'task', done: phases.task },
       ];
 
       const isRtl = rowParity % 2 === 1;
       const side = isRtl ? 'left' : 'right';
+      const rowDone = phases.theory && phases.quiz && phases.task;
 
       if (lastRowSide) {
-        wrap.appendChild(el('div', { class: `zigzag-conn-outer ${lastRowSide}` }, el('div', { class: `zigzag-conn ${prevDone ? 'done' : ''}` })));
+        wrap.appendChild(el('div', { class: `zigzag-conn-outer ${lastRowSide}` }, el('div', { class: `zigzag-conn ${rowDone ? 'done' : ''}` })));
       } else if (idx > 0) {
         wrap.appendChild(el('div', { class: 'path-connector' }));
       }
 
-      wrap.appendChild(el('div', { style: 'font-size:12px;color:var(--text-dim);font-weight:700;text-align:center;margin-bottom:2px;' }, lesson.title));
+      wrap.appendChild(el('div', { class: 'lesson-row-title' }, lesson.title));
 
-      const nodesWithCurrent = nodeDefs.map((nd) => {
-        const isCurrent = !nd.done && !nd.locked && !firstIncompleteFound;
-        if (isCurrent) firstIncompleteFound = true;
-        return { ...nd, isCurrent };
-      });
-
-      const displayOrder = isRtl ? [...nodesWithCurrent].reverse() : nodesWithCurrent;
+      const displayOrder = isRtl ? [...nodeDefs].reverse() : nodeDefs;
 
       const row = el('div', { class: 'zigzag-row' });
       displayOrder.forEach((nd) => {
         row.appendChild(miniNode({
           phase: nd.phase,
-          locked: nd.locked,
           done: nd.done,
-          current: nd.isCurrent,
           onClick: () => {
-            if (nd.locked) return;
             openLessonPhase(lesson, nd.phase, { onClose: () => renderPathPage(container) });
           },
         }));

@@ -1,6 +1,8 @@
 import { renderPathPage } from './pathPage.js';
 import { renderPracticePage } from './practicePage.js';
 import { renderProfilePage } from './profilePage.js';
+import { renderShopPage } from './shopPage.js';
+import { renderMissionsPage } from './missionsPage.js';
 import { applyTheme } from './theme.js';
 
 applyTheme();
@@ -11,6 +13,8 @@ const navButtons = document.querySelectorAll('.nav-btn');
 const routes = {
   path: renderPathPage,
   practice: renderPracticePage,
+  shop: renderShopPage,
+  missions: renderMissionsPage,
   profile: renderProfilePage,
 };
 

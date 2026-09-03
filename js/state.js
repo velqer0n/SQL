@@ -6,9 +6,22 @@ const STORAGE_KEY = 'querypath_state_v1';
 export const STATE_VERSION = 2; // bump to force any future migration logic
 
 const DAILY_MISSION_DEFS = [
-  { id: 'm-lesson', title: 'Пройдите 1 урок на Пути', track: 'lessons', target: 1, reward: 10 },
-  { id: 'm-practice', title: 'Решите 2 задачи в Практике', track: 'practice', target: 2, reward: 10 },
-  { id: 'm-coins', title: 'Заработайте 20 монет', track: 'coins', target: 20, reward: 15 },
+  { id: 'm-lesson', title: 'Пройдите 1 урок на Пути', track: 'lessons', target: 1, reward: 8 },
+  { id: 'm-lesson2', title: 'Пройдите 3 урока на Пути', track: 'lessons', target: 3, reward: 15 },
+  { id: 'm-practice', title: 'Решите 2 задачи в Практике', track: 'practice', target: 2, reward: 8 },
+  { id: 'm-practice2', title: 'Решите 4 задачи в Практике', track: 'practice', target: 4, reward: 15 },
+  { id: 'm-coins', title: 'Заработайте 30 монет', track: 'coins', target: 30, reward: 12 },
+];
+const ALL_MISSIONS_BONUS = 10; // rubies, awarded once all 5 daily missions are claimed
+
+const DAILY_REWARD_TABLE = [
+  { day: 1, coins: 5, rubies: 0 },
+  { day: 2, coins: 8, rubies: 0 },
+  { day: 3, coins: 10, rubies: 2 },
+  { day: 4, coins: 12, rubies: 2 },
+  { day: 5, coins: 15, rubies: 3 },
+  { day: 6, coins: 18, rubies: 3 },
+  { day: 7, coins: 25, rubies: 8 },
 ];
 
 const defaultState = {
@@ -36,6 +49,10 @@ const defaultState = {
     date: null,
     progress: { lessons: 0, practice: 0, coins: 0 },
     claimed: {}, // missionId -> true
+    bonusClaimed: false,
+  },
+  dailyReward: {
+    lastClaimedDate: null, // 'YYYY-MM-DD'
   },
   inventory: {
     owned: ['avatar-1', 'avatar-2', 'avatar-3', 'avatar-4', 'avatar-5', 'avatar-6', 'frame-none', 'theme-dark', 'theme-light'],
@@ -53,6 +70,7 @@ function loadState() {
     merged.aiSettings = { ...defaultState.aiSettings, ...(parsed.aiSettings || {}) };
     merged.settings = { ...defaultState.settings, ...(parsed.settings || {}) };
     merged.missions = { ...structuredClone(defaultState.missions), ...(parsed.missions || {}) };
+    merged.dailyReward = { ...structuredClone(defaultState.dailyReward), ...(parsed.dailyReward || {}) };
     merged.inventory = {
       owned: (parsed.inventory && parsed.inventory.owned) ? Array.from(new Set([...defaultState.inventory.owned, ...parsed.inventory.owned])) : [...defaultState.inventory.owned],
       equipped: { ...defaultState.inventory.equipped, ...((parsed.inventory && parsed.inventory.equipped) || {}) },
@@ -77,7 +95,7 @@ function todayStr() {
 function ensureDailyMissionsFresh() {
   const today = todayStr();
   if (state.missions.date !== today) {
-    state.missions = { date: today, progress: { lessons: 0, practice: 0, coins: 0 }, claimed: {} };
+    state.missions = { date: today, progress: { lessons: 0, practice: 0, coins: 0 }, claimed: {}, bonusClaimed: false };
     save();
   }
 }
@@ -206,6 +224,50 @@ export const Store = {
     this.addRubies(def.reward);
     save();
     return true;
+  },
+
+  allMissionsClaimed() {
+    ensureDailyMissionsFresh();
+    return DAILY_MISSION_DEFS.every((m) => state.missions.claimed[m.id]);
+  },
+
+  getMissionsBonus() {
+    return ALL_MISSIONS_BONUS;
+  },
+
+  claimMissionsBonus() {
+    ensureDailyMissionsFresh();
+    if (state.missions.bonusClaimed) return false;
+    if (!this.allMissionsClaimed()) return false;
+    state.missions.bonusClaimed = true;
+    this.addRubies(ALL_MISSIONS_BONUS);
+    save();
+    return true;
+  },
+
+  getDailyRewardTable() {
+    return DAILY_REWARD_TABLE;
+  },
+
+  getDailyRewardDayIndex() {
+    // cycles 1..7 based on current streak length
+    const streak = Math.max(1, state.streak || 1);
+    return ((streak - 1) % 7) + 1;
+  },
+
+  canClaimDailyReward() {
+    return state.dailyReward.lastClaimedDate !== todayStr();
+  },
+
+  claimDailyReward() {
+    if (!this.canClaimDailyReward()) return false;
+    const dayIndex = this.getDailyRewardDayIndex();
+    const entry = DAILY_REWARD_TABLE.find((d) => d.day === dayIndex) || DAILY_REWARD_TABLE[0];
+    if (entry.coins) this.addCoins(entry.coins);
+    if (entry.rubies) this.addRubies(entry.rubies);
+    state.dailyReward.lastClaimedDate = todayStr();
+    save();
+    return entry;
   },
 
   setProfileName(name) {

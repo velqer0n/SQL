@@ -1,7 +1,8 @@
 import { el, ICONS } from './utils.js';
 import { Store } from './state.js';
-import { SHOP_ITEMS, RARITY_LABEL, RARITY_COLOR, itemsByCategory } from '../data/shop.js';
+import { RARITY_LABEL, RARITY_COLOR, itemsByCategory } from '../data/shop.js';
 import { applyTheme } from './theme.js';
+import { renderTopbar } from './topbar.js';
 
 function htmlIcon(svg) {
   const span = el('span', { style: 'display:flex;width:18px;height:18px;' });
@@ -12,46 +13,34 @@ function htmlIcon(svg) {
 function itemPreviewIcon(item) {
   if (item.category === 'avatar') {
     return el('div', {
-      class: 'shop-item-icon avatar-chip',
+      class: `shop-item-icon avatar-chip rarity-${item.rarity}`,
       style: `background:linear-gradient(135deg, ${item.colors[0]}, ${item.colors[1]});`,
     });
   }
   if (item.category === 'theme') {
     return el('div', {
-      class: 'shop-item-icon',
+      class: `shop-item-icon rarity-${item.rarity}`,
       style: `background:linear-gradient(135deg, ${item.swatch[0]}, ${item.swatch[1]});`,
     });
   }
-  // frame
-  if (item.style === 'none') {
+  // frame — visual style driven by rarity tier, not per-item
+  if (item.rarity === 'common' && item.price === 0) {
     return el('div', { class: 'shop-item-icon', style: 'background:var(--bg-elev-2);color:var(--text-faint);' }, '—');
   }
+  if (item.rarity === 'mythical') {
+    return el('div', { class: 'shop-item-icon rarity-mythical', style: 'background:conic-gradient(from 0deg,#ef6f6c,#f2b84b,#5cd68a,#4fd8c8,#8b8ff0,#ef6f6c);' });
+  }
   const color = item.color || 'var(--teal)';
-  const bg = item.style === 'rainbow'
-    ? 'conic-gradient(from 0deg,#ef6f6c,#f2b84b,#5cd68a,#4fd8c8,#8b8ff0,#ef6f6c)'
-    : `radial-gradient(circle, transparent 55%, ${color} 58%, ${color} 68%, transparent 71%)`;
-  return el('div', { class: 'shop-item-icon', style: `background:${bg};` });
+  return el('div', { class: `shop-item-icon rarity-${item.rarity}`, style: `background:radial-gradient(circle, transparent 52%, ${color} 56%, ${color} 68%, transparent 72%);` });
 }
 
-export function openShop({ onClose } = {}) {
-  const overlay = el('div', { class: 'lesson-overlay' });
-  const topbar = el('div', { class: 'lesson-topbar' }, [
-    el('button', { class: 'icon-btn', onclick: () => { overlay.remove(); if (onClose) onClose(); } }, htmlIcon(ICONS.close)),
-    el('div', { style: 'font-weight:800;font-size:16px;' }, 'Магазин'),
-  ]);
+export function renderShopPage(container) {
+  container.innerHTML = '';
+  container.appendChild(renderTopbar());
+  container.appendChild(el('div', { class: 'page-title' }, 'Магазин'));
+  container.appendChild(el('div', { class: 'page-sub' }, 'Аватары, рамки и темы — за монеты и рубины.'));
 
-  const currencyBar = el('div', { class: 'shop-currency-bar' });
-  function renderCurrency() {
-    const s = Store.get();
-    currencyBar.innerHTML = '';
-    currencyBar.append(
-      el('div', { class: 'shop-currency', style: 'color:var(--amber);' }, [htmlIcon(ICONS.coin), String(s.coins)]),
-      el('div', { class: 'shop-currency', style: 'color:#e0546b;' }, [htmlIcon(ICONS.ruby), String(s.rubies)]),
-    );
-  }
-  renderCurrency();
-
-  const tabs = el('div', { class: 'shop-tabs' });
+  const tabs = el('div', { class: 'shop-tabs', style: 'position:static;' });
   const tabDefs = [['avatar', 'Аватары'], ['frame', 'Рамки'], ['theme', 'Темы']];
   let activeTab = 'avatar';
   const tabButtons = {};
@@ -103,16 +92,21 @@ export function openShop({ onClose } = {}) {
       });
       actionWrap.appendChild(btn);
     } else {
-      const priceLabel = item.currency === 'rubies' ? `${item.price} 💎` : `${item.price} 🪙`;
-      const btn = el('button', { class: 'shop-btn' }, priceLabel);
+      const btn = el('button', { class: 'shop-btn' });
+      const iconSpan = el('span', { style: 'display:flex;width:14px;height:14px;' });
+      iconSpan.innerHTML = item.currency === 'rubies' ? ICONS.ruby : ICONS.coin;
+      btn.append(String(item.price), iconSpan);
+      btn.style.display = 'flex';
+      btn.style.alignItems = 'center';
+      btn.style.gap = '5px';
       btn.addEventListener('click', () => {
         const result = Store.buyItem(item);
         if (result.ok) {
-          renderCurrency();
+          container.querySelector('.topbar')?.replaceWith(renderTopbar());
           renderGrid();
         } else if (result.reason === 'funds') {
           btn.textContent = 'Не хватает';
-          setTimeout(() => { btn.textContent = priceLabel; }, 1200);
+          setTimeout(() => renderGrid(), 1200);
         }
       });
       actionWrap.appendChild(btn);
@@ -122,7 +116,5 @@ export function openShop({ onClose } = {}) {
   }
 
   renderGrid();
-
-  overlay.append(topbar, currencyBar, tabs, grid);
-  document.body.appendChild(overlay);
+  container.append(tabs, grid);
 }
