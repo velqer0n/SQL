@@ -151,6 +151,26 @@ code, .mono{font-family:var(--font-mono);}
 .hex-btn.checkpoint{background:var(--amber);color:#2c1e04;}
 .hex-btn.checkpoint.done{background:var(--amber);color:#2c1e04;}
 
+/* ---------- Toggle switch (settings) ---------- */
+.toggle-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 0;border-bottom:1px solid var(--line);
+}
+.toggle-row:last-child{border-bottom:none;}
+.toggle-row .toggle-label{font-size:14.5px;font-weight:600;}
+.toggle-row .toggle-desc{font-size:12.5px;color:var(--text-faint);margin-top:2px;}
+.toggle-switch{
+  position:relative;width:46px;height:26px;flex-shrink:0;
+  background:var(--bg-elev-2);border:1px solid var(--line);border-radius:14px;
+  cursor:pointer;transition:background .15s;
+}
+.toggle-switch.on{background:var(--teal-dim);border-color:var(--teal);}
+.toggle-switch .knob{
+  position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;
+  background:var(--text-faint);transition:left .15s,background .15s;
+}
+.toggle-switch.on .knob{left:22px;background:var(--teal);}
+
 /* ---------- Zigzag path (theory/quiz/task per topic) ---------- */
 .zigzag-wrap{
   padding:6px 0 40px;
@@ -558,3 +578,97 @@ code, .mono{font-family:var(--font-mono);}
 }
 
 ::-webkit-scrollbar{width:0;height:0;}
+
+/* ==================== Alternate themes ==================== */
+body.theme-light{
+  --bg:#f4f5f9; --bg-elev:#ffffff; --bg-elev-2:#eef0f5; --line:#dde1ea;
+  --text:#1a1d29; --text-dim:#4d5468; --text-faint:#8890a3;
+  --teal:#0f9d8f; --teal-dim:#bfe9e3; --amber:#c98a1f; --coral:#d1483f; --violet:#6a6ee0; --green:#2fa860;
+}
+body.theme-sunset{
+  --bg:#241521; --bg-elev:#2f1c2a; --bg-elev-2:#3a2333; --line:#4a2c40;
+  --text:#fbe9e0; --text-dim:#cfa8a0; --text-faint:#8f6a68;
+  --teal:#f2795b; --teal-dim:#7a3a2c; --amber:#f2b84b; --coral:#ef6f6c; --violet:#c76b9e; --green:#e0a458;
+}
+body.theme-forest{
+  --bg:#0f1c14; --bg-elev:#16261b; --bg-elev-2:#1d3024; --line:#2a4534;
+  --text:#e8f5ec; --text-dim:#a8c4b2; --text-faint:#6f8f7a;
+  --teal:#5cd68a; --teal-dim:#2a5c3e; --amber:#d9c15a; --coral:#e0836f; --violet:#7fd9a8; --green:#5cd68a;
+}
+body.theme-aurora{
+  --bg:#12122a; --bg-elev:#1a1a38; --bg-elev-2:#232349; --line:#33335f;
+  --text:#ecebff; --text-dim:#b3b0e0; --text-faint:#7a77ab;
+  --teal:#8b8ff0; --teal-dim:#3d3d7a; --amber:#f2b84b; --coral:#ef6f6c; --violet:#8b8ff0; --green:#5cd68a;
+}
+body.theme-nebula{
+  --bg:#1a0f24; --bg-elev:#241531; --bg-elev-2:#2f1c3f; --line:#432a55;
+  --text:#f3e6fb; --text-dim:#c8a8d9; --text-faint:#8f6ba3;
+  --teal:#ef6f6c; --teal-dim:#7a2e2c; --amber:#f2b84b; --coral:#ef6f6c; --violet:#c084f0; --green:#5cd68a;
+}
+
+/* ==================== Rubies stat pill ==================== */
+.stat-pill.ruby{color:var(--coral);}
+
+/* ==================== Avatar with equipped colors + frame ==================== */
+.avatar-shell{position:relative;width:76px;height:76px;margin-bottom:12px;}
+.avatar-shell .avatar{width:100%;height:100%;margin:0;}
+.avatar-shell.frame-ring::after{
+  content:'';position:absolute;inset:-5px;border-radius:50%;
+  border:3px solid var(--frame-color, var(--teal));
+}
+.avatar-shell.frame-double::after{
+  content:'';position:absolute;inset:-6px;border-radius:50%;
+  border:2px solid var(--frame-color, var(--violet));
+  box-shadow:0 0 0 4px transparent, inset 0 0 0 2px var(--frame-color, var(--violet));
+}
+.avatar-shell.frame-gem::after{
+  content:'';position:absolute;inset:-6px;border-radius:50%;
+  border:3px solid var(--frame-color, var(--amber));
+  box-shadow:0 0 12px 1px var(--frame-color, var(--amber));
+}
+.avatar-shell.frame-rainbow::after{
+  content:'';position:absolute;inset:-6px;border-radius:50%;
+  border:3px solid transparent;
+  background:linear-gradient(#0000,#0000) padding-box, conic-gradient(from 0deg,#ef6f6c,#f2b84b,#5cd68a,#4fd8c8,#8b8ff0,#ef6f6c) border-box;
+  -webkit-mask:linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  mask:linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor; mask-composite:exclude;
+}
+
+/* small avatar chip used in shop grid */
+.avatar-chip{width:48px;height:48px;border-radius:50%;flex-shrink:0;}
+
+/* ==================== Shop ==================== */
+.shop-tabs{display:flex;border-bottom:1px solid var(--line);padding:0 12px;position:sticky;top:0;background:var(--bg);z-index:5;}
+.shop-tab{flex:1;padding:13px 4px;text-align:center;background:none;border:none;color:var(--text-faint);font-weight:700;font-size:13px;border-bottom:2px solid transparent;}
+.shop-tab.active{color:var(--text);border-bottom-color:var(--teal);}
+.shop-grid{padding:14px 18px;display:flex;flex-direction:column;gap:10px;}
+.shop-item{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 14px;border-radius:var(--radius-sm);
+  background:var(--bg-elev);border:1px solid var(--line);
+}
+.shop-item-icon{
+  width:48px;height:48px;border-radius:12px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;
+}
+.shop-item-body{flex:1;min-width:0;}
+.shop-item-name{font-weight:700;font-size:14px;margin-bottom:3px;}
+.rarity-badge{
+  display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:100px;
+  letter-spacing:.02em;
+}
+.shop-item-action{flex-shrink:0;}
+.shop-btn{
+  padding:9px 14px;border-radius:9px;border:none;font-weight:700;font-size:12.5px;
+  background:var(--teal);color:#0b1f1c;white-space:nowrap;
+}
+.shop-btn.owned{background:var(--bg-elev-2);color:var(--text-faint);}
+.shop-btn.equipped{background:var(--teal-dim);color:#eafffb;}
+.shop-btn:disabled{opacity:.5;}
+.shop-currency-bar{
+  display:flex;gap:16px;padding:14px 18px;border-bottom:1px solid var(--line);
+}
+.shop-currency{display:flex;align-items:center;gap:6px;font-weight:800;font-size:15px;}
+.shop-currency svg{width:18px;height:18px;}
