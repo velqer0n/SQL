@@ -83,17 +83,17 @@ export const SHOP_ITEMS = [
   { id: 'outfit-gold', category: 'outfit', name: 'Золотая мантия', rarity: 'mythical', price: 60, currency: 'rubies', style: 'cape', color: '#f2b84b' },
 
   // ---- Платья и кимоно/юката ----
-  { id: 'outfit-dress-red', category: 'outfit', name: 'Платье, красное', rarity: 'common', price: 15, currency: 'coins', style: 'dress', color: '#c0304a', accent: '#f4d6df' },
-  { id: 'outfit-dress-black', category: 'outfit', name: 'Платье, чёрное классическое', rarity: 'common', price: 15, currency: 'coins', style: 'dress', color: '#1c1e26', accent: '#c9a24a' },
-  { id: 'outfit-dress-emerald', category: 'outfit', name: 'Платье, изумрудное', rarity: 'rare', price: 40, currency: 'coins', style: 'dress', color: '#1f8a5c', accent: '#e8f5ec' },
+  { id: 'outfit-dress-red', category: 'outfit', name: 'Платье, красное', rarity: 'common', price: 15, currency: 'coins', style: 'dress', color: '#c0304a', accent: '#f4d6df', excludeGender: 'male' },
+  { id: 'outfit-dress-black', category: 'outfit', name: 'Платье, чёрное классическое', rarity: 'common', price: 15, currency: 'coins', style: 'dress', color: '#1c1e26', accent: '#c9a24a', excludeGender: 'male' },
+  { id: 'outfit-dress-emerald', category: 'outfit', name: 'Платье, изумрудное', rarity: 'rare', price: 40, currency: 'coins', style: 'dress', color: '#1f8a5c', accent: '#e8f5ec', excludeGender: 'male' },
   { id: 'outfit-yukata-blue', category: 'outfit', name: 'Юката, синяя летняя', rarity: 'rare', price: 40, currency: 'coins', style: 'kimono', color: '#3f6fa8', accent: '#f4f0e2' },
   { id: 'outfit-yukata-white', category: 'outfit', name: 'Юката, белая с красным оби', rarity: 'rare', price: 45, currency: 'coins', style: 'kimono', color: '#eef0f4', accent: '#c0304a' },
-  { id: 'outfit-dress-gala', category: 'outfit', name: 'Платье, вечернее фиолетовое', rarity: 'epic', price: 100, currency: 'coins', style: 'dress', color: '#5a2e7a', accent: '#e0b84f' },
+  { id: 'outfit-dress-gala', category: 'outfit', name: 'Платье, вечернее фиолетовое', rarity: 'epic', price: 100, currency: 'coins', style: 'dress', color: '#5a2e7a', accent: '#e0b84f', excludeGender: 'male' },
   { id: 'outfit-kimono-indigo', category: 'outfit', name: 'Кимоно, индиго', rarity: 'epic', price: 110, currency: 'coins', style: 'kimono', color: '#2a3a6b', accent: '#eef0f4' },
   { id: 'outfit-kimono-sakura', category: 'outfit', name: 'Кимоно «Сакура»', rarity: 'legendary', price: 35, currency: 'rubies', style: 'kimono', color: '#f0a8c0', accent: '#e0b84f' },
-  { id: 'outfit-dress-starlight', category: 'outfit', name: 'Платье «Звёздная ночь»', rarity: 'legendary', price: 35, currency: 'rubies', style: 'dress', color: '#161b3a', accent: '#c7cbe0' },
+  { id: 'outfit-dress-starlight', category: 'outfit', name: 'Платье «Звёздная ночь»', rarity: 'legendary', price: 35, currency: 'rubies', style: 'dress', color: '#161b3a', accent: '#c7cbe0', excludeGender: 'male' },
   { id: 'outfit-kimono-imperial', category: 'outfit', name: 'Кимоно «Императорское»', rarity: 'mythical', price: 70, currency: 'rubies', style: 'kimono', color: '#8a1c2c', accent: '#e0b84f' },
-  { id: 'outfit-dress-aurora', category: 'outfit', name: 'Платье «Аврора»', rarity: 'mythical', price: 70, currency: 'rubies', style: 'dress', accent: '#ffffff' },
+  { id: 'outfit-dress-aurora', category: 'outfit', name: 'Платье «Аврора»', rarity: 'mythical', price: 70, currency: 'rubies', style: 'dress', accent: '#ffffff', excludeGender: 'male' },
 
   // ================= FRAMES (5/5/3/3/2 = 18) — visuals driven by rarity in shopPage.js =================
   { id: 'frame-none', category: 'frame', name: 'Без рамки', rarity: 'common', price: 0, currency: 'coins' },
@@ -143,6 +143,18 @@ export const SHOP_ITEMS = [
   { id: 'theme-aurora-myth', category: 'theme', name: 'Мифическая Аврора', rarity: 'mythical', price: 90, currency: 'rubies', swatch: ['#12122a', '#8b8ff0'], cssClass: 'theme-aurora theme-mythical-fx' },
   { id: 'theme-nebula-myth', category: 'theme', name: 'Мифическая Туманность', rarity: 'mythical', price: 100, currency: 'rubies', swatch: ['#1a0f24', '#ef6f6c'], cssClass: 'theme-nebula theme-mythical-fx' },
 ];
+
+export const RARITY_ORDER = ['common', 'rare', 'epic', 'legendary', 'mythical'];
+
+export function sortByRarity(items, direction = 'asc') {
+  const sorted = [...items].sort((a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity));
+  return direction === 'desc' ? sorted.reverse() : sorted;
+}
+
+export function isItemAllowedForGender(item, gender) {
+  if (!item.excludeGender || gender === 'unisex') return true;
+  return item.excludeGender !== gender;
+}
 
 export function getItem(id) {
   return SHOP_ITEMS.find((i) => i.id === id);
