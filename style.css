@@ -43,10 +43,7 @@ code, .mono{font-family:var(--font-mono);}
   align-items:center;
   justify-content:space-between;
   padding:14px 18px 10px;
-  position:sticky;
-  top:0;
-  background:linear-gradient(180deg, var(--bg) 70%, transparent);
-  z-index:20;
+  background:var(--bg);
 }
 .stat-pill.clickable{cursor:pointer;}
 .stat-pill{
