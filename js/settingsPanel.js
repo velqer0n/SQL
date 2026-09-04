@@ -24,7 +24,25 @@ export function openSettings({ onClose } = {}) {
   body.appendChild(aiSettingsBlock());
   body.appendChild(accountBlock());
   body.appendChild(dataBlock());
+  body.appendChild(testModeBlock());
   body.appendChild(updateSiteBlock());
+}
+
+function testModeBlock() {
+  const block = el('div', { class: 'section-block', style: 'margin:0 0 20px;' }, [
+    el('h3', {}, 'Тестирование'),
+    el('div', { style: 'font-size:12.5px;color:var(--text-faint);margin-bottom:12px;line-height:1.5;' },
+      'Быстро пополнить баланс, чтобы сразу оценить покупки в магазине.'),
+  ]);
+  const btn = el('button', { class: 'btn-secondary' }, 'Выдать 100 000 монет и 100 000 рубинов');
+  btn.addEventListener('click', () => {
+    Store.addCoins(100000);
+    Store.addRubies(100000);
+    btn.textContent = 'Готово! Обновите страницу магазина';
+    setTimeout(() => { btn.textContent = 'Выдать 100 000 монет и 100 000 рубинов'; }, 1800);
+  });
+  block.appendChild(btn);
+  return block;
 }
 
 function normalizeSupabaseUrl(raw) {
