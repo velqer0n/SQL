@@ -45,6 +45,56 @@ export const SHOP_ITEMS = [
   { id: 'avatar-17', category: 'avatar', name: 'Космос', rarity: 'mythical', price: 70, currency: 'rubies', colors: ['#1a0f3c', '#ef6f6c'] },
   { id: 'avatar-18', category: 'avatar', name: 'Сингулярность', rarity: 'mythical', price: 80, currency: 'rubies', colors: ['#0a0a1a', '#8b8ff0'] },
 
+  // ================= HAIR (без лица — только силуэт причёски) =================
+  { id: 'hair-none', category: 'hair', name: 'Без причёски', rarity: 'common', price: 0, currency: 'coins', style: 'none' },
+  { id: 'hair-short-black', category: 'hair', name: 'Короткая, чёрная', rarity: 'common', price: 10, currency: 'coins', style: 'short', color: '#1a1d29' },
+  { id: 'hair-short-brown', category: 'hair', name: 'Короткая, каштановая', rarity: 'common', price: 10, currency: 'coins', style: 'short', color: '#6b4226' },
+  { id: 'hair-long-black', category: 'hair', name: 'Длинная, чёрная', rarity: 'rare', price: 35, currency: 'coins', style: 'long', color: '#1a1d29' },
+  { id: 'hair-long-blonde', category: 'hair', name: 'Длинная, светлая', rarity: 'rare', price: 35, currency: 'coins', style: 'long', color: '#e0c068' },
+  { id: 'hair-curly', category: 'hair', name: 'Кудри', rarity: 'epic', price: 90, currency: 'coins', style: 'curly', color: '#8a5f1e' },
+  { id: 'hair-mohawk', category: 'hair', name: 'Ирокез', rarity: 'legendary', price: 30, currency: 'rubies', style: 'mohawk', color: '#ef6f6c' },
+  { id: 'hair-rainbow', category: 'hair', name: 'Радужная', rarity: 'mythical', price: 60, currency: 'rubies', style: 'long' },
+
+  // ---- Расширение причёсок (вдохновлено референс-подборками, не копия 1:1) ----
+  { id: 'hair-short-red', category: 'hair', name: 'Короткая, рыжая', rarity: 'common', price: 12, currency: 'coins', style: 'short', color: '#c4592f' },
+  { id: 'hair-short-gray', category: 'hair', name: 'Короткая, седая', rarity: 'common', price: 12, currency: 'coins', style: 'short', color: '#9aa1b8' },
+  { id: 'hair-undercut', category: 'hair', name: 'Андеркат', rarity: 'common', price: 15, currency: 'coins', style: 'undercut', color: '#2a2318' },
+  { id: 'hair-wavy-brown', category: 'hair', name: 'Волны, каштановые', rarity: 'rare', price: 40, currency: 'coins', style: 'wavy', color: '#7a4a24' },
+  { id: 'hair-wavy-auburn', category: 'hair', name: 'Волны, медные', rarity: 'rare', price: 40, currency: 'coins', style: 'wavy', color: '#a85a2e' },
+  { id: 'hair-ponytail-black', category: 'hair', name: 'Хвост, чёрный', rarity: 'rare', price: 40, currency: 'coins', style: 'ponytail', color: '#1a1d29' },
+  { id: 'hair-bun-brown', category: 'hair', name: 'Пучок, каштановый', rarity: 'rare', price: 45, currency: 'coins', style: 'bun', color: '#6b4226' },
+  { id: 'hair-twintails-pink', category: 'hair', name: 'Два хвостика, розовые', rarity: 'epic', price: 100, currency: 'coins', style: 'twintails', color: '#ef8fb8' },
+  { id: 'hair-braid-blonde', category: 'hair', name: 'Коса, светлая', rarity: 'epic', price: 100, currency: 'coins', style: 'braid', color: '#e0c068' },
+  { id: 'hair-wavy-silver', category: 'hair', name: 'Волны, серебряные', rarity: 'epic', price: 110, currency: 'coins', style: 'wavy', color: '#c7cbe0' },
+  { id: 'hair-twintails-violet', category: 'hair', name: 'Два хвостика, фиолетовые', rarity: 'legendary', price: 35, currency: 'rubies', style: 'twintails', color: '#8b6ff0' },
+  { id: 'hair-ponytail-fire', category: 'hair', name: 'Хвост, огненный', rarity: 'legendary', price: 35, currency: 'rubies', style: 'ponytail', color: '#f2542d' },
+  { id: 'hair-bun-gold', category: 'hair', name: 'Пучок, золотой', rarity: 'legendary', price: 40, currency: 'rubies', style: 'bun', color: '#e0b84f' },
+  { id: 'hair-twintails-rainbow', category: 'hair', name: 'Два хвостика, радужные', rarity: 'mythical', price: 70, currency: 'rubies', style: 'twintails' },
+  { id: 'hair-braid-galaxy', category: 'hair', name: 'Коса «Галактика»', rarity: 'mythical', price: 80, currency: 'rubies', style: 'braid' },
+
+  // ================= OUTFIT (одежда — плечи/воротник под аватаром) =================
+  { id: 'outfit-none', category: 'outfit', name: 'Без одежды', rarity: 'common', price: 0, currency: 'coins', style: 'none' },
+  { id: 'outfit-tee-teal', category: 'outfit', name: 'Футболка, бирюза', rarity: 'common', price: 10, currency: 'coins', style: 'crew', color: '#4fd8c8' },
+  { id: 'outfit-tee-coral', category: 'outfit', name: 'Футболка, коралл', rarity: 'common', price: 10, currency: 'coins', style: 'crew', color: '#ef6f6c' },
+  { id: 'outfit-hoodie-gray', category: 'outfit', name: 'Худи, серое', rarity: 'rare', price: 35, currency: 'coins', style: 'hoodie', color: '#9aa1b8' },
+  { id: 'outfit-hoodie-violet', category: 'outfit', name: 'Худи, фиолетовое', rarity: 'rare', price: 35, currency: 'coins', style: 'hoodie', color: '#8b8ff0' },
+  { id: 'outfit-collar', category: 'outfit', name: 'Рубашка с воротником', rarity: 'epic', price: 90, currency: 'coins', style: 'collar', color: '#f2b84b' },
+  { id: 'outfit-cape', category: 'outfit', name: 'Плащ героя', rarity: 'legendary', price: 30, currency: 'rubies', style: 'cape', color: '#e0546b' },
+  { id: 'outfit-gold', category: 'outfit', name: 'Золотая мантия', rarity: 'mythical', price: 60, currency: 'rubies', style: 'cape', color: '#f2b84b' },
+
+  // ---- Платья и кимоно/юката ----
+  { id: 'outfit-dress-red', category: 'outfit', name: 'Платье, красное', rarity: 'common', price: 15, currency: 'coins', style: 'dress', color: '#c0304a', accent: '#f4d6df' },
+  { id: 'outfit-dress-black', category: 'outfit', name: 'Платье, чёрное классическое', rarity: 'common', price: 15, currency: 'coins', style: 'dress', color: '#1c1e26', accent: '#c9a24a' },
+  { id: 'outfit-dress-emerald', category: 'outfit', name: 'Платье, изумрудное', rarity: 'rare', price: 40, currency: 'coins', style: 'dress', color: '#1f8a5c', accent: '#e8f5ec' },
+  { id: 'outfit-yukata-blue', category: 'outfit', name: 'Юката, синяя летняя', rarity: 'rare', price: 40, currency: 'coins', style: 'kimono', color: '#3f6fa8', accent: '#f4f0e2' },
+  { id: 'outfit-yukata-white', category: 'outfit', name: 'Юката, белая с красным оби', rarity: 'rare', price: 45, currency: 'coins', style: 'kimono', color: '#eef0f4', accent: '#c0304a' },
+  { id: 'outfit-dress-gala', category: 'outfit', name: 'Платье, вечернее фиолетовое', rarity: 'epic', price: 100, currency: 'coins', style: 'dress', color: '#5a2e7a', accent: '#e0b84f' },
+  { id: 'outfit-kimono-indigo', category: 'outfit', name: 'Кимоно, индиго', rarity: 'epic', price: 110, currency: 'coins', style: 'kimono', color: '#2a3a6b', accent: '#eef0f4' },
+  { id: 'outfit-kimono-sakura', category: 'outfit', name: 'Кимоно «Сакура»', rarity: 'legendary', price: 35, currency: 'rubies', style: 'kimono', color: '#f0a8c0', accent: '#e0b84f' },
+  { id: 'outfit-dress-starlight', category: 'outfit', name: 'Платье «Звёздная ночь»', rarity: 'legendary', price: 35, currency: 'rubies', style: 'dress', color: '#161b3a', accent: '#c7cbe0' },
+  { id: 'outfit-kimono-imperial', category: 'outfit', name: 'Кимоно «Императорское»', rarity: 'mythical', price: 70, currency: 'rubies', style: 'kimono', color: '#8a1c2c', accent: '#e0b84f' },
+  { id: 'outfit-dress-aurora', category: 'outfit', name: 'Платье «Аврора»', rarity: 'mythical', price: 70, currency: 'rubies', style: 'dress', accent: '#ffffff' },
+
   // ================= FRAMES (5/5/3/3/2 = 18) — visuals driven by rarity in shopPage.js =================
   { id: 'frame-none', category: 'frame', name: 'Без рамки', rarity: 'common', price: 0, currency: 'coins' },
   { id: 'frame-teal', category: 'frame', name: 'Бирюзовое кольцо', rarity: 'common', price: 15, currency: 'coins', color: '#4fd8c8' },
@@ -100,4 +150,53 @@ export function getItem(id) {
 
 export function itemsByCategory(category) {
   return SHOP_ITEMS.filter((i) => i.category === category);
+}
+
+// ================= CHESTS =================
+// odds are percentages that should sum to 100 within a chest.
+export const CHESTS = [
+  {
+    id: 'chest-basic',
+    name: 'Простой сундук',
+    desc: 'Шанс на любую категорию: аватар, рамку или тему.',
+    currency: 'coins',
+    price: 40,
+    odds: { common: 60, rare: 30, epic: 8, legendary: 1.8, mythical: 0.2 },
+  },
+  {
+    id: 'chest-grand',
+    name: 'Большой сундук',
+    desc: 'Заметно выше шансы на редкие и эпические предметы.',
+    currency: 'coins',
+    price: 120,
+    odds: { common: 35, rare: 40, epic: 20, legendary: 4.5, mythical: 0.5 },
+  },
+  {
+    id: 'chest-ruby',
+    name: 'Рубиновый сундук',
+    desc: 'Гарантированно минимум эпический предмет.',
+    currency: 'rubies',
+    price: 25,
+    odds: { epic: 60, legendary: 35, mythical: 5 },
+  },
+];
+
+export function getChest(id) {
+  return CHESTS.find((c) => c.id === id);
+}
+
+// ================= CONSUMABLES (stackable, not "owned" once and done) =================
+export const CONSUMABLES = [
+  {
+    id: 'streak-freeze',
+    name: 'Заморозка стрика',
+    desc: 'Если пропустите день — одна заморозка защитит серию от сброса.',
+    price: 20,
+    currency: 'coins',
+    icon: '❄️',
+  },
+];
+
+export function getConsumable(id) {
+  return CONSUMABLES.find((c) => c.id === id);
 }
