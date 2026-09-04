@@ -801,10 +801,27 @@ body.theme-mythical-fx .hex-btn.open{
   100%{background-position:0% 50%;}
 }
 
-/* ==================== Layered avatar: body + outfit + hair (no face, per request) ==================== */
+/* ==================== Layered avatar: head + torso/shoulders (bust silhouette, no face) ==================== */
 .avatar-clip{
   width:100%;height:100%;border-radius:50%;overflow:hidden;position:relative;
 }
+
+/* Torso/shoulders — bare body-tone shape at the bottom, clothing (outfit) painted on top */
+.avatar-torso-wrap{position:absolute;inset:0;}
+.avatar-torso-base{
+  position:absolute;left:0;right:0;bottom:0;height:62%;
+  clip-path:polygon(30% 22%, 70% 22%, 100% 100%, 0% 100%);
+}
+
+/* Head — a distinct smaller circle near the top; hair is nested inside so its
+   existing %-based CSS automatically scales/repositions to fit the head, no
+   changes needed to any hair class. */
+.avatar-head-wrap{
+  position:absolute;top:0;left:50%;width:58%;height:58%;
+  transform:translateX(-50%);
+}
+.avatar-head{position:absolute;inset:0;border-radius:50%;}
+
 .avatar-outfit{position:absolute;left:0;right:0;bottom:0;height:38%;}
 .avatar-outfit-none{display:none;}
 .avatar-outfit-crew{clip-path:polygon(18% 100%, 18% 42%, 50% 20%, 82% 42%, 82% 100%);}
