@@ -1,8 +1,9 @@
 import { el, ICONS } from './utils.js';
 import { Store } from './state.js';
-import { RARITY_LABEL, RARITY_COLOR, itemsByCategory, CHESTS, CONSUMABLES, getItem } from '../data/shop.js';
+import { RARITY_LABEL, RARITY_COLOR, itemsByCategory, CHESTS, CONSUMABLES, getItem, sortByRarity, isItemAllowedForGender } from '../data/shop.js';
 import { applyTheme } from './theme.js';
 import { renderTopbar } from './topbar.js';
+import { buildItemPreviewNode } from './avatarRender.js';
 
 function htmlIcon(svg) {
   const span = el('span', { style: 'display:flex;width:18px;height:18px;' });
@@ -11,27 +12,14 @@ function htmlIcon(svg) {
 }
 
 function itemPreviewIcon(item) {
-  if (item.category === 'avatar') {
-    return el('div', {
-      class: `shop-item-icon avatar-chip rarity-${item.rarity}`,
-      style: `background:linear-gradient(135deg, ${item.colors[0]}, ${item.colors[1]});`,
-    });
+  if (item.category === 'hair' || item.category === 'outfit' || item.category === 'frame' || item.category === 'avatar') {
+    return buildItemPreviewNode(item);
   }
-  if (item.category === 'theme') {
-    return el('div', {
-      class: `shop-item-icon rarity-${item.rarity}`,
-      style: `background:linear-gradient(135deg, ${item.swatch[0]}, ${item.swatch[1]});`,
-    });
-  }
-  // frame — visual style driven by rarity tier, not per-item
-  if (item.rarity === 'common' && item.price === 0) {
-    return el('div', { class: 'shop-item-icon', style: 'background:var(--bg-elev-2);color:var(--text-faint);' }, '—');
-  }
-  if (item.rarity === 'mythical') {
-    return el('div', { class: 'shop-item-icon rarity-mythical', style: 'background:conic-gradient(from 0deg,#ef6f6c,#f2b84b,#5cd68a,#4fd8c8,#8b8ff0,#ef6f6c);' });
-  }
-  const color = item.color || 'var(--teal)';
-  return el('div', { class: `shop-item-icon rarity-${item.rarity}`, style: `background:radial-gradient(circle, transparent 52%, ${color} 56%, ${color} 68%, transparent 72%);` });
+  // theme: flat gradient swatch is the item itself (a color scheme), no "worn" render makes sense
+  return el('div', {
+    class: `shop-item-icon rarity-${item.rarity}`,
+    style: `background:linear-gradient(135deg, ${item.swatch[0]}, ${item.swatch[1]});`,
+  });
 }
 
 export function renderShopPage(container) {
@@ -52,9 +40,18 @@ export function renderShopPage(container) {
 
   const grid = el('div', { class: 'shop-grid' });
 
+  let sortDir = 'asc';
+  const sortBtn = el('button', { class: 'facet-btn', style: 'margin:0 18px 10px;display:none;' }, 'Редкость ↑');
+  sortBtn.addEventListener('click', () => {
+    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    sortBtn.textContent = sortDir === 'asc' ? 'Редкость ↑' : 'Редкость ↓';
+    renderGrid();
+  });
+
   function setTab(id) {
     activeTab = id;
     Object.entries(tabButtons).forEach(([k, b]) => b.classList.toggle('active', k === id));
+    sortBtn.style.display = ['boost', 'chest'].includes(id) ? 'none' : '';
     renderGrid();
   }
 
@@ -68,7 +65,7 @@ export function renderShopPage(container) {
       CHESTS.forEach((chest) => grid.appendChild(renderChestRow(chest)));
       return;
     }
-    const items = itemsByCategory(activeTab);
+    const items = sortByRarity(itemsByCategory(activeTab), sortDir);
     items.forEach((item) => grid.appendChild(renderItemRow(item)));
   }
 
@@ -85,6 +82,7 @@ export function renderShopPage(container) {
     const btn = el('button', { class: 'shop-btn' });
     const iconSpan = el('span', { style: 'display:flex;width:14px;height:14px;' });
     iconSpan.innerHTML = item.currency === 'rubies' ? ICONS.ruby : ICONS.coin;
+      iconSpan.style.color = item.currency === 'rubies' ? '#e0546b' : '#c98a1f';
     btn.append('Купить · ', String(item.price), iconSpan);
     btn.style.display = 'flex';
     btn.style.alignItems = 'center';
@@ -111,13 +109,13 @@ export function renderShopPage(container) {
       el('div', { class: 'shop-item-icon', style: 'background:linear-gradient(135deg, var(--amber), #8a5f1e);font-size:22px;' }, '🎁'),
       el('div', { class: 'shop-item-body' }, [
         el('div', { class: 'shop-item-name' }, chest.name),
-        el('div', { style: 'font-size:11.5px;color:var(--text-faint);margin-top:2px;line-height:1.4;' }, chest.desc),
-        el('div', { style: 'font-size:10.5px;color:var(--text-faint);margin-top:5px;' }, oddsText),
+        el('div', { style: 'font-size:11.5px;color:var(--text-faint);margin-top:4px;line-height:1.5;' }, oddsText),
       ]),
     ]);
     const btn = el('button', { class: 'shop-btn' });
     const iconSpan = el('span', { style: 'display:flex;width:14px;height:14px;' });
     iconSpan.innerHTML = chest.currency === 'rubies' ? ICONS.ruby : ICONS.coin;
+    iconSpan.style.color = chest.currency === 'rubies' ? '#e0546b' : '#c98a1f';
     btn.append('Открыть · ', String(chest.price), iconSpan);
     btn.style.display = 'flex';
     btn.style.alignItems = 'center';
@@ -146,14 +144,13 @@ export function renderShopPage(container) {
       inner = el('div', { class: 'complete-wrap', style: 'padding:40px 24px;' }, [
         el('div', { class: 'complete-emoji' }, '🎉'),
         el('div', { class: 'complete-title' }, 'Новый предмет!'),
-        el('div', {
-          class: `shop-item-icon rarity-${item.rarity}`,
-          style: `width:72px;height:72px;margin:10px 0;background:${
-            item.category === 'avatar' ? `linear-gradient(135deg, ${item.colors[0]}, ${item.colors[1]})`
-            : item.category === 'theme' ? `linear-gradient(135deg, ${item.swatch[0]}, ${item.swatch[1]})`
-            : (item.color ? `radial-gradient(circle, transparent 52%, ${item.color} 56%, ${item.color} 68%, transparent 72%)` : 'conic-gradient(from 0deg,#ef6f6c,#f2b84b,#5cd68a,#4fd8c8,#8b8ff0,#ef6f6c)')
-          };`,
-        }),
+        (() => {
+          const node = itemPreviewIcon(item);
+          node.style.width = '72px';
+          node.style.height = '72px';
+          node.style.margin = '10px auto';
+          return node;
+        })(),
         el('div', { style: 'font-weight:800;font-size:16px;margin-bottom:4px;' }, item.name),
         el('span', { class: 'rarity-badge', style: `background:${RARITY_COLOR[item.rarity]}22;color:${RARITY_COLOR[item.rarity]};` }, RARITY_LABEL[item.rarity]),
       ]);
@@ -176,8 +173,9 @@ export function renderShopPage(container) {
     const s = Store.get();
     const owned = Store.ownsItem(item.id);
     const equipped = s.inventory.equipped[item.category] === item.id;
+    const allowed = isItemAllowedForGender(item, Store.getGender());
 
-    const row = el('div', { class: 'shop-item' }, [
+    const row = el('div', { class: 'shop-item', style: allowed ? '' : 'opacity:.45;' }, [
       itemPreviewIcon(item),
       el('div', { class: 'shop-item-body' }, [
         el('div', { class: 'shop-item-name' }, item.name),
@@ -187,6 +185,11 @@ export function renderShopPage(container) {
         }, RARITY_LABEL[item.rarity]),
       ]),
     ]);
+
+    if (!allowed) {
+      row.appendChild(el('div', { class: 'shop-item-action', style: 'font-size:11px;color:var(--text-faint);max-width:80px;text-align:right;' }, 'Недоступно для этого пола'));
+      return row;
+    }
 
     const actionWrap = el('div', { class: 'shop-item-action' });
     if (equipped) {
@@ -203,6 +206,7 @@ export function renderShopPage(container) {
       const btn = el('button', { class: 'shop-btn' });
       const iconSpan = el('span', { style: 'display:flex;width:14px;height:14px;' });
       iconSpan.innerHTML = item.currency === 'rubies' ? ICONS.ruby : ICONS.coin;
+      iconSpan.style.color = item.currency === 'rubies' ? '#e0546b' : '#c98a1f';
       btn.append(String(item.price), iconSpan);
       btn.style.display = 'flex';
       btn.style.alignItems = 'center';
@@ -224,5 +228,5 @@ export function renderShopPage(container) {
   }
 
   renderGrid();
-  container.append(tabs, grid);
+  container.append(tabs, sortBtn, grid);
 }

@@ -1,7 +1,8 @@
 import { el, ICONS } from './utils.js';
 import { Store } from './state.js';
-import { itemsByCategory, RARITY_LABEL, RARITY_COLOR } from '../data/shop.js';
-import { buildAvatarNode } from './avatarRender.js';
+import { itemsByCategory, RARITY_LABEL, RARITY_COLOR, sortByRarity, isItemAllowedForGender } from '../data/shop.js';
+import { buildAvatarNode, buildItemPreviewNode } from './avatarRender.js';
+import { openCharacterViewer } from './characterViewer.js';
 
 function htmlIcon(svg) {
   const span = el('span', { style: 'display:flex;width:18px;height:18px;' });
@@ -13,7 +14,18 @@ export function openAvatarEditor({ onClose } = {}) {
   const overlay = el('div', { class: 'lesson-overlay' });
   const topbar = el('div', { class: 'lesson-topbar' }, [
     el('button', { class: 'icon-btn', onclick: () => { overlay.remove(); if (onClose) onClose(); } }, htmlIcon(ICONS.close)),
-    el('div', { style: 'font-weight:800;font-size:16px;' }, 'Редактор аватара'),
+    el('div', { style: 'font-weight:800;font-size:16px;flex:1;' }, 'Редактор аватара'),
+    (() => {
+      const b = el('button', { class: 'icon-btn' }, htmlIcon(ICONS.expand));
+      b.title = 'Развернуть на весь экран';
+      b.addEventListener('click', () => {
+        openCharacterViewer({
+          onClose: () => {},
+          onEdit: () => {},
+        });
+      });
+      return b;
+    })(),
   ]);
 
   // preview = equipped items overridden per-category by whatever is being "tried on"
@@ -33,7 +45,7 @@ export function openAvatarEditor({ onClose } = {}) {
 
   const stage = el('div', { style: 'perspective:900px;display:flex;justify-content:center;padding:24px 0 4px;' });
   const spinner = el('div', {
-    style: `position:relative;width:${PREVIEW_SIZE}px;height:${PREVIEW_SIZE}px;transform-style:preserve-3d;cursor:grab;will-change:transform;touch-action:none;`,
+    style: `position:relative;width:${PREVIEW_SIZE}px;height:${PREVIEW_SIZE}px;transform-style:preserve-3d;cursor:grab;will-change:transform;`,
   });
   stage.appendChild(spinner);
 
@@ -84,19 +96,34 @@ export function openAvatarEditor({ onClose } = {}) {
     if (inertiaId) { cancelAnimationFrame(inertiaId); inertiaId = null; }
   }
 
+  let pendingStartX = null; // pointerdown position, before we know if this is a rotate-drag or a page scroll
+  let pendingStartY = null;
+
   spinner.addEventListener('pointerdown', (e) => {
     stopInertia();
-    dragging = true;
+    dragging = false; // not committed yet — wait to see the gesture direction
+    pendingStartX = e.clientX;
+    pendingStartY = e.clientY;
     dragStartX = e.clientX;
     dragStartRotation = rotation;
     lastMoveX = e.clientX;
     lastMoveT = performance.now();
     velocity = 0;
-    spinner.style.cursor = 'grabbing';
-    spinner.setPointerCapture(e.pointerId);
   });
   spinner.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
+    if (pendingStartX === null) return;
+    if (!dragging) {
+      const dx = e.clientX - pendingStartX;
+      const dy = e.clientY - pendingStartY;
+      // Only commit to a rotate-drag once the gesture is clearly more horizontal
+      // than vertical — otherwise let the page scroll normally (never block it).
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      if (Math.abs(dy) > Math.abs(dx)) { pendingStartX = null; return; }
+      dragging = true;
+      dragStartX = e.clientX;
+      dragStartRotation = rotation;
+      spinner.style.cursor = 'grabbing';
+    }
     const now = performance.now();
     const delta = e.clientX - dragStartX;
     rotation = dragStartRotation + delta * 0.6;
@@ -107,6 +134,7 @@ export function openAvatarEditor({ onClose } = {}) {
     applyRotation();
   });
   function endDrag() {
+    pendingStartX = null;
     if (!dragging) return;
     dragging = false;
     spinner.style.cursor = 'grab';
@@ -134,6 +162,7 @@ export function openAvatarEditor({ onClose } = {}) {
   }
   spinner.addEventListener('pointerup', endDrag);
   spinner.addEventListener('pointerleave', endDrag);
+  spinner.addEventListener('pointercancel', endDrag);
 
   const previewWrap = el('div', {}, [stage, spinHint]);
 
@@ -147,6 +176,7 @@ export function openAvatarEditor({ onClose } = {}) {
     const btn = el('button', { class: 'shop-btn' });
     const iconSpan = el('span', { style: 'display:flex;width:14px;height:14px;' });
     iconSpan.innerHTML = item.currency === 'rubies' ? ICONS.ruby : ICONS.coin;
+      iconSpan.style.color = item.currency === 'rubies' ? '#e0546b' : '#c98a1f';
     btn.append('Купить · ', String(item.price), iconSpan);
     btn.style.display = 'flex'; btn.style.alignItems = 'center'; btn.style.gap = '5px';
     btn.addEventListener('click', () => {
@@ -168,6 +198,22 @@ export function openAvatarEditor({ onClose } = {}) {
     ]));
   }
 
+  const genderRow = el('div', { class: 'chip-row', style: 'padding:0 18px 10px;' });
+  const genderDefs = [['unisex', 'Унисекс'], ['female', 'Женский'], ['male', 'Мужской']];
+  const genderButtons = {};
+  genderDefs.forEach(([id, label]) => {
+    const b = el('button', {
+      class: `chip ${Store.getGender() === id ? 'active' : ''}`,
+      onclick: () => {
+        Store.setGender(id);
+        Object.entries(genderButtons).forEach(([k, btn]) => btn.classList.toggle('active', k === id));
+        renderGrid();
+      },
+    }, label);
+    genderButtons[id] = b;
+    genderRow.appendChild(b);
+  });
+
   const tabs = el('div', { class: 'shop-tabs', style: 'position:static;' });
   const tabDefs = [['avatar', 'Тело'], ['hair', 'Причёска'], ['outfit', 'Одежда']];
   let activeTab = 'avatar';
@@ -176,6 +222,14 @@ export function openAvatarEditor({ onClose } = {}) {
     const btn = el('button', { class: `shop-tab ${id === activeTab ? 'active' : ''}`, onclick: () => setTab(id) }, label);
     tabButtons[id] = btn;
     tabs.appendChild(btn);
+  });
+
+  let sortDir = 'asc';
+  const sortBtn = el('button', { class: 'facet-btn', style: 'margin:0 18px 10px;' }, 'Редкость ↑');
+  sortBtn.addEventListener('click', () => {
+    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    sortBtn.textContent = sortDir === 'asc' ? 'Редкость ↑' : 'Редкость ↓';
+    renderGrid();
   });
 
   const grid = el('div', { class: 'shop-grid' });
@@ -188,18 +242,8 @@ export function openAvatarEditor({ onClose } = {}) {
 
   function renderGrid() {
     grid.innerHTML = '';
-    itemsByCategory(activeTab).forEach((item) => grid.appendChild(renderItemRow(item)));
-  }
-
-  function swatch(item) {
-    if (item.category === 'avatar') {
-      return el('div', { class: 'shop-item-icon', style: `background:linear-gradient(135deg, ${item.colors[0]}, ${item.colors[1]});` });
-    }
-    if (item.style === 'none') {
-      return el('div', { class: 'shop-item-icon', style: 'background:var(--bg-elev-2);color:var(--text-faint);' }, '—');
-    }
-    const bg = item.color || 'conic-gradient(from 0deg,#ef6f6c,#f2b84b,#5cd68a,#4fd8c8,#8b8ff0,#ef6f6c)';
-    return el('div', { class: 'shop-item-icon', style: `background:${bg};` });
+    const items = sortByRarity(itemsByCategory(activeTab), sortDir);
+    items.forEach((item) => grid.appendChild(renderItemRow(item)));
   }
 
   function renderItemRow(item) {
@@ -207,14 +251,23 @@ export function openAvatarEditor({ onClose } = {}) {
     const owned = Store.ownsItem(item.id);
     const equipped = s.inventory.equipped[item.category] === item.id;
     const isTryingOn = tryOn[item.category] && tryOn[item.category].id === item.id;
+    const allowed = isItemAllowedForGender(item, Store.getGender());
 
-    const row = el('div', { class: 'shop-item', style: isTryingOn ? 'border-color:var(--violet);' : '' }, [
-      swatch(item),
+    const row = el('div', {
+      class: 'shop-item',
+      style: `${isTryingOn ? 'border-color:var(--violet);' : ''}${!allowed ? 'opacity:.45;' : ''}`,
+    }, [
+      buildItemPreviewNode(item),
       el('div', { class: 'shop-item-body' }, [
         el('div', { class: 'shop-item-name' }, item.name),
         el('span', { class: 'rarity-badge', style: `background:${RARITY_COLOR[item.rarity]}22;color:${RARITY_COLOR[item.rarity]};` }, RARITY_LABEL[item.rarity]),
       ]),
     ]);
+
+    if (!allowed) {
+      row.appendChild(el('div', { class: 'shop-item-action', style: 'font-size:11px;color:var(--text-faint);max-width:80px;text-align:right;' }, 'Недоступно для этого пола'));
+      return row;
+    }
 
     // Clicking the row itself always previews the look (owned or not) — cheap and instant.
     row.style.cursor = 'pointer';
@@ -253,6 +306,7 @@ export function openAvatarEditor({ onClose } = {}) {
 
   renderGrid();
   renderTryOnBanner();
-  overlay.append(topbar, previewWrap, tryOnBanner, tabs, grid);
+  const body = el('div', { class: 'lesson-body' }, [previewWrap, tryOnBanner, genderRow, tabs, sortBtn, grid]);
+  overlay.append(topbar, body);
   document.body.appendChild(overlay);
 }

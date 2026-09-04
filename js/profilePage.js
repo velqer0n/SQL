@@ -7,6 +7,7 @@ import { ACHIEVEMENTS } from '../data/achievements.js';
 import { openSettings } from './settingsPanel.js';
 import { buildAvatarNode } from './avatarRender.js';
 import { openAvatarEditor } from './avatarEditor.js';
+import { openCharacterViewer } from './characterViewer.js';
 import { openCollection } from './collectionPage.js';
 
 export function renderProfilePage(container) {
@@ -20,7 +21,12 @@ export function renderProfilePage(container) {
   const avatarShell = el('div', { class: `avatar-shell ${frameRarityClass}`, style: `${frameColorVar}cursor:pointer;` }, [
     buildAvatarNode(s.inventory.equipped),
   ]);
-  avatarShell.addEventListener('click', () => openAvatarEditor({ onClose: () => renderProfilePage(container) }));
+  avatarShell.addEventListener('click', () => {
+    openCharacterViewer({
+      onClose: () => renderProfilePage(container),
+      onEdit: () => openAvatarEditor({ onClose: () => renderProfilePage(container) }),
+    });
+  });
 
   container.appendChild(el('div', { class: 'profile-head' }, [
     avatarShell,

@@ -27,6 +27,19 @@ export function openSettings({ onClose } = {}) {
   body.appendChild(updateSiteBlock());
 }
 
+function normalizeSupabaseUrl(raw) {
+  const trimmed = raw.trim().replace(/\/+$/, '');
+  // Common mistake: pasting the dashboard page URL instead of the API URL.
+  const dashboardMatch = trimmed.match(/supabase\.com\/dashboard\/project\/([a-z0-9]+)/i);
+  if (dashboardMatch) {
+    return { ok: true, url: `https://${dashboardMatch[1]}.supabase.co`, autoFixed: true };
+  }
+  if (/^https:\/\/[a-z0-9]+\.supabase\.co$/i.test(trimmed)) {
+    return { ok: true, url: trimmed, autoFixed: false };
+  }
+  return { ok: false };
+}
+
 function accountBlock() {
   const block = el('div', { class: 'section-block', style: 'margin:0 0 20px;' }, [
     el('h3', {}, 'Облачный аккаунт (Supabase)'),
@@ -39,14 +52,29 @@ function accountBlock() {
     host.appendChild(el('div', { style: 'font-size:12.5px;color:var(--text-faint);margin-bottom:12px;line-height:1.5;' },
       'Подключите свой Supabase-проект, чтобы прогресс сохранялся в облаке и не терялся при очистке кэша или смене телефона.'));
     const urlInput = el('input', { class: 'ai-input', style: 'width:100%;margin-bottom:8px;', placeholder: 'https://xxxxx.supabase.co' });
-    const keyInput = el('input', { class: 'ai-input', style: 'width:100%;margin-bottom:10px;', placeholder: 'anon public ключ' });
+    const keyInput = el('input', { class: 'ai-input', style: 'width:100%;margin-bottom:6px;', placeholder: 'publishable / anon public ключ' });
+    const errMsg = el('div', { style: 'font-size:12px;color:var(--coral);margin-bottom:8px;min-height:16px;line-height:1.4;' });
     const btn = el('button', { class: 'btn-primary' }, 'Подключить');
     btn.addEventListener('click', () => {
-      if (!urlInput.value.trim() || !keyInput.value.trim()) return;
-      configureSupabase(urlInput.value, keyInput.value);
-      renderState();
+      errMsg.textContent = '';
+      const key = keyInput.value.trim();
+      if (!urlInput.value.trim() || !key) {
+        errMsg.textContent = 'Заполните оба поля.';
+        return;
+      }
+      const result = normalizeSupabaseUrl(urlInput.value);
+      if (!result.ok) {
+        errMsg.textContent = 'Похоже, это не тот адрес. Нужен именно Project URL вида https://xxxxx.supabase.co из Settings → Data API — не адрес страницы дашборда.';
+        return;
+      }
+      if (result.autoFixed) {
+        errMsg.style.color = 'var(--teal)';
+        errMsg.textContent = `Похоже, вы вставили ссылку на дашборд — я исправил на ${result.url}`;
+      }
+      configureSupabase(result.url, key);
+      setTimeout(renderState, result.autoFixed ? 1400 : 0);
     });
-    host.append(urlInput, keyInput, btn);
+    host.append(urlInput, keyInput, errMsg, btn);
   }
 
   function renderLoggedOut() {
@@ -76,11 +104,23 @@ function accountBlock() {
     }
 
     signInBtn.addEventListener('click', async () => {
+      if (!/^\S+@\S+\.\S+$/.test(emailInput.value.trim())) {
+        msg.style.color = 'var(--coral)'; msg.textContent = 'Введите настоящий email (например, name@mail.com), не логин.';
+        return;
+      }
       msg.style.color = 'var(--text-faint)'; msg.textContent = 'Входим…';
       const res = await signIn(emailInput.value.trim(), passInput.value);
       if (res.ok) { await afterLogin(); } else { msg.style.color = 'var(--coral)'; msg.textContent = res.error; }
     });
     signUpBtn.addEventListener('click', async () => {
+      if (!/^\S+@\S+\.\S+$/.test(emailInput.value.trim())) {
+        msg.style.color = 'var(--coral)'; msg.textContent = 'Введите настоящий email (например, name@mail.com), не логин.';
+        return;
+      }
+      if (passInput.value.length < 6) {
+        msg.style.color = 'var(--coral)'; msg.textContent = 'Пароль должен быть не короче 6 символов.';
+        return;
+      }
       msg.style.color = 'var(--text-faint)'; msg.textContent = 'Регистрируем…';
       const res = await signUp(emailInput.value.trim(), passInput.value);
       if (res.ok) {

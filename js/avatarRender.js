@@ -81,3 +81,25 @@ export function buildAvatarNode(equipped) {
 
   return el('div', { class: 'avatar-clip' }, [bodyEl, ...outfitParts, hairEl]);
 }
+
+/**
+ * Builds a small "worn" preview for a shop item — a mini avatar showing the item
+ * actually applied (hair/outfit on a neutral body, or a frame ring around one) —
+ * instead of a flat color swatch that looks the same as a theme icon.
+ */
+export function buildItemPreviewNode(item) {
+  const equipped = {
+    avatar: item.category === 'avatar' ? item.id : 'avatar-6',
+    hair: item.category === 'hair' ? item.id : 'hair-none',
+    outfit: item.category === 'outfit' ? item.id : 'outfit-none',
+    frame: item.category === 'frame' ? item.id : 'frame-none',
+  };
+  const wrap = el('div', { class: 'shop-item-icon', style: 'padding:0;overflow:visible;background:var(--bg-elev-2);' });
+  const shell = el('div', { class: 'avatar-shell', style: 'width:100%;height:100%;margin:0;' }, [buildAvatarNode(equipped)]);
+  if (item.category === 'frame' && item.price > 0) {
+    shell.classList.add(`frame-rarity-${item.rarity}`);
+    if (item.color) shell.style.setProperty('--frame-color', item.color);
+  }
+  wrap.appendChild(shell);
+  return wrap;
+}

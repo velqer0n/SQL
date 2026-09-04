@@ -42,4 +42,5 @@ export const ICONS = {
   send: `<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>`,
   check: `<svg viewBox="0 0 24 24"><path d="M5 12l5 5L19 7"/></svg>`,
   x: `<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>`,
+  expand: `<svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/></svg>`,
 };

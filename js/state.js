@@ -86,6 +86,7 @@ const defaultState = {
   inventory: {
     owned: ['avatar-1', 'avatar-2', 'avatar-3', 'avatar-4', 'avatar-5', 'avatar-6', 'frame-none', 'theme-dark', 'theme-light', 'hair-none', 'outfit-none'],
     equipped: { avatar: 'avatar-1', frame: 'frame-none', theme: 'theme-dark', hair: 'hair-none', outfit: 'outfit-none' },
+    gender: 'unisex', // 'unisex' | 'male' | 'female' — restricts a few gendered items (e.g. dresses)
   },
   consumables: {}, // id -> count, e.g. { 'streak-freeze': 2 }
 };
@@ -108,6 +109,7 @@ function loadState() {
     merged.inventory = {
       owned: (parsed.inventory && parsed.inventory.owned) ? Array.from(new Set([...defaultState.inventory.owned, ...parsed.inventory.owned])) : [...defaultState.inventory.owned],
       equipped: { ...defaultState.inventory.equipped, ...((parsed.inventory && parsed.inventory.equipped) || {}) },
+      gender: (parsed.inventory && parsed.inventory.gender) || 'unisex',
     };
     return merged;
   } catch (e) {
@@ -478,6 +480,15 @@ export const Store = {
 
   getEquipped() {
     return state.inventory.equipped;
+  },
+
+  getGender() {
+    return state.inventory.gender || 'unisex';
+  },
+
+  setGender(gender) {
+    state.inventory.gender = gender;
+    save();
   },
 
   // --- Chests ---
