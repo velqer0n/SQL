@@ -1,6 +1,9 @@
 import { el, ICONS, formatTime, mdBold } from './utils.js';
 import { Store } from './state.js';
 import { renderTaskView } from './taskView.js';
+import { feedbackFx, levelUpFx, achievementFx } from './soundFx.js';
+import { openAiAssistant } from './aiAssistant.js';
+import { fireConfetti } from './confetti.js';
 
 function coinsForErrors(errors) {
   if (errors === 0) return 10;
@@ -113,21 +116,39 @@ export function openLesson(lesson, { onClose } = {}) {
 
   function renderQuiz(q) {
     const confirmRequired = Store.get().settings.confirmAnswers;
-    renderQuizQuestionInto(body, footer, q, confirmRequired, (isCorrect, explanation) => {
+    renderQuizQuestionInto(body, footer, q, confirmRequired, (isCorrect, explanation, comboResult) => {
       if (!isCorrect) errors++;
       else quizCorrectFirstTry++;
       footer.innerHTML = '';
-      showFeedback(isCorrect, explanation);
-    });
+      showFeedback(isCorrect, explanation, comboResult, q);
+    }, { lessonId: lesson.id, lessonTitle: lesson.title });
   }
 
-  function showFeedback(isCorrect, explanation) {
+  function showFeedback(isCorrect, explanation, comboResult, q) {
     const sheet = el('div', { class: `feedback-sheet ${isCorrect ? 'correct' : 'wrong'}` });
-    sheet.append(
-      el('div', { class: `feedback-head ${isCorrect ? 'correct' : 'wrong'}` }, isCorrect ? '✓ Правильно!' : '✕ Неправильно'),
+    const children = [
+      el('div', { class: 'feedback-head-row' }, [
+        el('div', { class: `feedback-icon-badge ${isCorrect ? 'correct' : 'wrong'}` }, isCorrect ? '✓' : '✕'),
+        el('div', { class: `feedback-head ${isCorrect ? 'correct' : 'wrong'}`, style: 'margin:0;' }, isCorrect ? 'Правильно!' : 'Неправильно'),
+      ]),
       el('div', { class: 'feedback-text' }, explanation || ''),
-      el('button', { class: 'btn-primary', onclick: () => { sheet.remove(); next(); } }, 'Продолжить')
-    );
+    ];
+    if (isCorrect && comboResult && comboResult.bonusAwarded) {
+      children.push(el('div', { class: 'combo-banner' }, `🔥 ${comboResult.combo} верных подряд! +${comboResult.bonusAwarded} монет`));
+    }
+    if (!isCorrect && q) {
+      const explainBtn = el('button', { class: 'btn-secondary', style: 'margin-top:2px;' }, 'Объяснить с Индекс 🔎');
+      explainBtn.addEventListener('click', () => {
+        openAiAssistant({
+          taskTitle: lesson.title,
+          taskDescription: q.question,
+          getCode: () => '',
+        });
+      });
+      children.push(explainBtn);
+    }
+    children.push(el('button', { class: 'btn-primary', onclick: () => { sheet.remove(); next(); } }, 'Продолжить'));
+    sheet.append(...children);
     overlay.appendChild(sheet);
   }
 
@@ -156,10 +177,22 @@ export function openLesson(lesson, { onClose } = {}) {
     const correctCount = quizCorrectFirstTry + (errors <= totalQuizQuestions ? 1 : 0); // rough accuracy signal
     const accuracy = Math.max(0, Math.round(((totalGraded - Math.min(errors, totalGraded)) / totalGraded) * 100));
     const coins = coinsForErrors(errors);
+    const isCheckpoint = lesson.kind === 'checkpoint';
+    let bonus = null;
+    if (isCheckpoint) {
+      const rubyRoll = Math.random() < 0.35;
+      if (rubyRoll) {
+        bonus = { type: 'rubies', amount: 5 + Math.floor(Math.random() * 11) }; // 5-15
+        Store.addRubies(bonus.amount);
+      } else {
+        bonus = { type: 'coins', amount: 15 + Math.floor(Math.random() * 26) }; // 15-40
+        Store.addCoins(bonus.amount);
+      }
+    }
 
     body.appendChild(el('div', { class: 'complete-wrap' }, [
-      el('div', { class: 'complete-emoji' }, '🎉'),
-      el('div', { class: 'complete-title' }, 'Урок завершён!'),
+      el('div', { class: 'complete-emoji' }, isCheckpoint ? '🏆' : '🎉'),
+      el('div', { class: 'complete-title' }, isCheckpoint ? 'Глава пройдена!' : 'Урок завершён!'),
       el('div', { class: 'complete-stats' }, [
         el('div', { class: 'complete-stat' }, [
           el('div', { class: 'lbl' }, 'Точность'),
@@ -171,9 +204,30 @@ export function openLesson(lesson, { onClose } = {}) {
         ]),
       ]),
       el('div', { class: 'coin-banner' }, [htmlIcon(ICONS.coin), `+${coins} монет`]),
+      bonus ? el('div', {
+        class: 'coin-banner',
+        style: `margin-top:8px;${bonus.type === 'rubies' ? 'background:rgba(224,84,107,.12);border-color:rgba(224,84,107,.35);color:#e0546b;' : ''}`,
+      }, [htmlIcon(bonus.type === 'rubies' ? ICONS.ruby : ICONS.coin), `Бонус главы: +${bonus.amount} ${bonus.type === 'rubies' ? 'рубинов' : 'монет'}`]) : null,
     ]));
 
-    Store.completeLesson(lesson.id, { accuracy, timeSec, errors, coinsEarned: coins });
+    const completionResult = Store.completeLesson(lesson.id, { accuracy, timeSec, errors, coinsEarned: coins });
+
+    if (isCheckpoint) fireConfetti(50);
+    if (completionResult.leveledUp) {
+      fireConfetti(30);
+      levelUpFx();
+      body.appendChild(el('div', { class: 'coin-banner', style: 'margin-top:8px;background:rgba(139,143,240,.14);border-color:rgba(139,143,240,.4);color:var(--violet);' },
+        `⭐ Новый уровень: ${completionResult.newLevel}!`));
+    } else if (isCheckpoint) {
+      achievementFx();
+    }
+    if (completionResult.newAchievements && completionResult.newAchievements.length) {
+      completionResult.newAchievements.forEach((a) => {
+        body.appendChild(el('div', { class: 'coin-banner', style: 'margin-top:8px;background:rgba(242,184,75,.12);border-color:rgba(242,184,75,.35);color:var(--amber);' },
+          `${a.icon} Новая ачивка: ${a.name}`));
+      });
+      achievementFx();
+    }
 
     footer.appendChild(el('button', { class: 'btn-primary', onclick: () => finish(true) }, 'Продолжить'));
   }
@@ -193,7 +247,19 @@ function htmlIcon(svg) {
 // combined openLesson() above.
 // ---------------------------------------------------------------------------
 
-function renderQuizQuestionInto(body, footer, q, confirmRequired, onAnswered) {
+function renderQuizQuestionInto(body, footer, q, confirmRequired, onAnsweredRaw, context = {}) {
+  const onAnswered = (isCorrect, explanation) => {
+    feedbackFx(isCorrect);
+    const comboResult = Store.recordAnswer(isCorrect);
+    if (!isCorrect) {
+      Store.addMistake({
+        lessonId: context.lessonId || null,
+        lessonTitle: context.lessonTitle || '',
+        question: q.question,
+      });
+    }
+    onAnsweredRaw(isCorrect, explanation, comboResult);
+  };
   body.innerHTML = '';
   footer.innerHTML = '';
   body.appendChild(el('div', { class: 'quiz-q' }, q.question));
@@ -402,7 +468,9 @@ function renderQuizQuestionInto(body, footer, q, confirmRequired, onAnswered) {
   }
 }
 
-export function openLessonPhase(lesson, phase, { onClose } = {}) {
+export function openLessonPhase(lesson, phase, { onClose, variant = 'normal' } = {}) {
+  const content = variant === 'hard' ? lesson.hard : lesson;
+  const effectiveId = variant === 'hard' ? `${lesson.id}-hard` : lesson.id;
   const overlay = el('div', { class: 'lesson-overlay' });
   const progressFill = el('div', { class: 'lesson-progress-fill' });
   const topbar = el('div', { class: 'lesson-topbar' }, [
@@ -420,7 +488,7 @@ export function openLessonPhase(lesson, phase, { onClose } = {}) {
   }
 
   if (phase === 'theory') {
-    const pages = chunkTheorySlides(lesson.theory || []);
+    const pages = chunkTheorySlides(content.theory || []);
     let i = 0;
     function renderPage() {
       progressFill.style.width = `${Math.round(((i + 1) / pages.length) * 100)}%`;
@@ -445,7 +513,7 @@ export function openLessonPhase(lesson, phase, { onClose } = {}) {
         class: 'btn-primary',
         onclick: () => {
           if (isLast) {
-            Store.markPhaseDone(lesson.id, 'theory');
+            Store.markPhaseDone(effectiveId, 'theory');
             finish();
           } else {
             i++;
@@ -459,36 +527,51 @@ export function openLessonPhase(lesson, phase, { onClose } = {}) {
   }
 
   if (phase === 'quiz') {
-    const questions = lesson.quiz || [];
+    const questions = content.quiz || [];
     const confirmRequired = Store.get().settings.confirmAnswers;
     let i = 0;
     let localErrors = 0;
     function renderQ() {
       progressFill.style.width = `${Math.round((i / questions.length) * 100)}%`;
-      renderQuizQuestionInto(body, footer, questions[i], confirmRequired, (isCorrect, explanation) => {
+      const q = questions[i];
+      renderQuizQuestionInto(body, footer, q, confirmRequired, (isCorrect, explanation, comboResult) => {
         if (!isCorrect) localErrors++;
         footer.innerHTML = '';
         const sheet = el('div', { class: `feedback-sheet ${isCorrect ? 'correct' : 'wrong'}` });
-        sheet.append(
-          el('div', { class: `feedback-head ${isCorrect ? 'correct' : 'wrong'}` }, isCorrect ? '✓ Правильно!' : '✕ Неправильно'),
+        const children = [
+          el('div', { class: 'feedback-head-row' }, [
+        el('div', { class: `feedback-icon-badge ${isCorrect ? 'correct' : 'wrong'}` }, isCorrect ? '✓' : '✕'),
+        el('div', { class: `feedback-head ${isCorrect ? 'correct' : 'wrong'}`, style: 'margin:0;' }, isCorrect ? 'Правильно!' : 'Неправильно'),
+      ]),
           el('div', { class: 'feedback-text' }, explanation || ''),
-          el('button', {
-            class: 'btn-primary',
-            onclick: () => {
-              sheet.remove();
-              i++;
-              if (i >= questions.length) {
-                Store.addPhaseErrors(lesson.id, localErrors);
-                Store.markPhaseDone(lesson.id, 'quiz');
-                finish();
-              } else {
-                renderQ();
-              }
-            },
-          }, 'Продолжить')
-        );
+        ];
+        if (isCorrect && comboResult && comboResult.bonusAwarded) {
+          children.push(el('div', { class: 'combo-banner' }, `🔥 ${comboResult.combo} верных подряд! +${comboResult.bonusAwarded} монет`));
+        }
+        if (!isCorrect) {
+          const explainBtn = el('button', { class: 'btn-secondary', style: 'margin-top:2px;' }, 'Объяснить с Индекс 🔎');
+          explainBtn.addEventListener('click', () => {
+            openAiAssistant({ taskTitle: lesson.title, taskDescription: q.question, getCode: () => '' });
+          });
+          children.push(explainBtn);
+        }
+        children.push(el('button', {
+          class: 'btn-primary',
+          onclick: () => {
+            sheet.remove();
+            i++;
+            if (i >= questions.length) {
+              Store.addPhaseErrors(effectiveId, localErrors);
+              Store.markPhaseDone(effectiveId, 'quiz');
+              finish();
+            } else {
+              renderQ();
+            }
+          },
+        }, 'Продолжить'));
+        sheet.append(...children);
         overlay.appendChild(sheet);
-      });
+      }, { lessonId: effectiveId, lessonTitle: lesson.title });
     }
     renderQ();
     return;
@@ -499,23 +582,28 @@ export function openLessonPhase(lesson, phase, { onClose } = {}) {
     const wrap = el('div');
     body.appendChild(wrap);
     progressFill.style.width = '100%';
-    renderTaskView(wrap, lesson.task, {
+    renderTaskView(wrap, content.task, {
       onSolved: (taskErrors) => {
-        const prevErrors = Store.getPhases(lesson.id).errors || 0;
+        const prevErrors = Store.getPhases(effectiveId).errors || 0;
         const totalErrors = prevErrors + taskErrors;
-        Store.markPhaseDone(lesson.id, 'task');
-        const coins = coinsForErrors(totalErrors);
-        const totalGraded = (lesson.quiz ? lesson.quiz.length : 0) + 1;
+        Store.markPhaseDone(effectiveId, 'task');
+        let coins = coinsForErrors(totalErrors);
+        let hardBonus = 0;
+        if (variant === 'hard') {
+          hardBonus = 10;
+          coins += hardBonus;
+        }
+        const totalGraded = (content.quiz ? content.quiz.length : 0) + 1;
         const accuracy = Math.max(0, Math.round(((totalGraded - Math.min(totalErrors, totalGraded)) / totalGraded) * 100));
-        Store.completeLesson(lesson.id, { accuracy, timeSec: 0, errors: totalErrors, coinsEarned: coins });
-        Store.resetPhaseErrors(lesson.id);
+        const completionResult = Store.completeLesson(effectiveId, { accuracy, timeSec: 0, errors: totalErrors, coinsEarned: coins });
+        Store.resetPhaseErrors(effectiveId);
 
         body.innerHTML = '';
         body.style.padding = '';
         footer.innerHTML = '';
         body.appendChild(el('div', { class: 'complete-wrap' }, [
-          el('div', { class: 'complete-emoji' }, '🎉'),
-          el('div', { class: 'complete-title' }, 'Урок завершён!'),
+          el('div', { class: 'complete-emoji' }, variant === 'hard' ? '🔥' : '🎉'),
+          el('div', { class: 'complete-title' }, variant === 'hard' ? 'Сложный режим пройден!' : 'Урок завершён!'),
           el('div', { class: 'complete-stats' }, [
             el('div', { class: 'complete-stat' }, [
               el('div', { class: 'lbl' }, 'Точность'),
@@ -523,7 +611,15 @@ export function openLessonPhase(lesson, phase, { onClose } = {}) {
             ]),
           ]),
           el('div', { class: 'coin-banner' }, [htmlIcon(ICONS.coin), `+${coins} монет`]),
+          hardBonus ? el('div', { style: 'font-size:11.5px;color:var(--text-faint);margin-top:-6px;' }, `Включая +${hardBonus} за сложный режим`) : null,
+          completionResult.leveledUp ? el('div', { class: 'coin-banner', style: 'margin-top:8px;background:rgba(139,143,240,.14);border-color:rgba(139,143,240,.4);color:var(--violet);' },
+            `⭐ Новый уровень: ${completionResult.newLevel}!`) : null,
+          ...(completionResult.newAchievements || []).map((a) => el('div', { class: 'coin-banner', style: 'margin-top:8px;background:rgba(242,184,75,.12);border-color:rgba(242,184,75,.35);color:var(--amber);' },
+            `${a.icon} Новая ачивка: ${a.name}`)),
         ]));
+        if (completionResult.leveledUp) { fireConfetti(30); levelUpFx(); }
+        else if (completionResult.newAchievements && completionResult.newAchievements.length) { achievementFx(); }
+        else if (variant === 'hard') { fireConfetti(24); }
         footer.appendChild(el('button', { class: 'btn-primary', onclick: finish }, 'Продолжить'));
       },
     });

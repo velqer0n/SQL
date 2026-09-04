@@ -14,7 +14,7 @@ export function openPracticeTask(task, { onClose } = {}) {
 
   renderTaskView(body, task, {
     onSolved: () => {
-      Store.completePracticeTask(task.id);
+      return Store.completePracticeTask(task.id);
     },
   });
 

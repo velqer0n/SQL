@@ -52,6 +52,7 @@ export function renderPathPage(container) {
     let rowParity = 0; // 0 = LTR, 1 = RTL
     let lastModule = null;
     let lastRowSide = null; // 'left' | 'right' | null
+    let currentModuleLessonIds = [];
 
     function isLessonFullyDone(lesson) {
       return !!state.completedLessons[lesson.id];
@@ -71,10 +72,13 @@ export function renderPathPage(container) {
         lastModule = lesson.module;
         rowParity = 0;
         lastRowSide = null;
+        currentModuleLessonIds = [];
       }
 
       if (lesson.kind === 'checkpoint') {
         const done = isLessonFullyDone(lesson);
+        const moduleComplete = currentModuleLessonIds.length > 0 && currentModuleLessonIds.every((id) => state.completedLessons[id]);
+        const locked = !moduleComplete && !done;
 
         if (lastRowSide) {
           wrap.appendChild(el('div', { class: `zigzag-conn-outer ${lastRowSide}` }, el('div', { class: `zigzag-conn ${done ? 'done' : ''}` })));
@@ -83,14 +87,18 @@ export function renderPathPage(container) {
         }
 
         const classes = ['hex-btn', 'checkpoint'];
-        classes.push(done ? 'done' : 'open');
+        if (done) classes.push('done');
+        else if (locked) classes.push('locked');
+        else classes.push('open');
         const btn = el('button', { class: classes.join(' ') }, htmlIcon(ICONS.trophy));
         btn.addEventListener('click', () => {
+          if (locked) return;
           openLesson(lesson, { onClose: () => renderPathPage(container) });
         });
         wrap.appendChild(el('div', { style: 'display:flex;flex-direction:column;align-items:center;gap:6px;' }, [
           btn,
           el('div', { class: 'lesson-row-title checkpoint-title' }, lesson.title),
+          locked ? el('div', { style: 'font-size:10.5px;color:var(--text-faint);' }, 'Пройдите все уроки главы') : null,
         ]));
         rowParity = 0;
         lastRowSide = null;
@@ -110,6 +118,8 @@ export function renderPathPage(container) {
         lastRowSide = null;
         return;
       }
+
+      currentModuleLessonIds.push(lesson.id);
 
       // regular 3-phase lesson — all phases always open, only 'done' differs
       const phases = state.lessonPhases[lesson.id] || { theory: false, quiz: false, task: false };
@@ -147,6 +157,38 @@ export function renderPathPage(container) {
 
       lastRowSide = side;
       rowParity++;
+
+      // Optional "hard mode" tier: unlocks once the base lesson is fully done.
+      if (lesson.hard && rowDone) {
+        const hardId = `${lesson.id}-hard`;
+        const hardPhases = state.lessonPhases[hardId] || { theory: false, quiz: false, task: false };
+        const hardNodeDefs = [
+          { phase: 'theory', done: hardPhases.theory },
+          { phase: 'quiz', done: hardPhases.quiz },
+          { phase: 'task', done: hardPhases.task },
+        ];
+        const hardIsRtl = rowParity % 2 === 1;
+        const hardSide = hardIsRtl ? 'left' : 'right';
+
+        wrap.appendChild(el('div', { class: `zigzag-conn-outer ${lastRowSide}` }, el('div', { class: `zigzag-conn ${rowDone ? 'done' : ''}` })));
+        wrap.appendChild(el('div', { class: 'lesson-row-title', style: 'color:var(--coral);' }, `🔥 ${lesson.title} — сложнее`));
+
+        const hardDisplayOrder = hardIsRtl ? [...hardNodeDefs].reverse() : hardNodeDefs;
+        const hardRow = el('div', { class: 'zigzag-row' });
+        hardDisplayOrder.forEach((nd) => {
+          hardRow.appendChild(miniNode({
+            phase: nd.phase,
+            done: nd.done,
+            onClick: () => {
+              openLessonPhase(lesson, nd.phase, { onClose: () => renderPathPage(container), variant: 'hard' });
+            },
+          }));
+        });
+        wrap.appendChild(el('div', { class: 'zigzag-row-outer' }, hardRow));
+        lastRowSide = hardSide;
+        rowParity++;
+      }
+      return;
     });
 
     container.appendChild(wrap);

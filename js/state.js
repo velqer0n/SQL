@@ -2,8 +2,25 @@
 // Keeps: profile info, coins/rubies, streak, completed lessons/tasks,
 // daily missions, shop inventory + equipped cosmetics, settings.
 
+import { SHOP_ITEMS } from '../data/shop.js';
+import { PRACTICE_TASKS } from '../data/practice.js';
+import { ACHIEVEMENTS } from '../data/achievements.js';
 const STORAGE_KEY = 'querypath_state_v1';
 export const STATE_VERSION = 2; // bump to force any future migration logic
+
+const COMBO_MILESTONE = 5;
+const COMBO_BONUS_COINS = 5;
+
+function levelForXp(xp) {
+  // level thresholds grow linearly: level n needs n*40 total xp
+  let level = 1;
+  let remaining = xp;
+  while (remaining >= level * 40) {
+    remaining -= level * 40;
+    level++;
+  }
+  return { level, xpIntoLevel: remaining, xpForNextLevel: level * 40 };
+}
 
 const DAILY_MISSION_DEFS = [
   { id: 'm-lesson', title: 'Пройдите 1 урок на Пути', track: 'lessons', target: 1, reward: 8 },
@@ -31,6 +48,11 @@ const defaultState = {
   },
   coins: 0,
   rubies: 0,
+  xp: 0,
+  comboStreak: 0,
+  bestCombo: 0,
+  mistakes: [], // { lessonId, lessonTitle, question, addedAt }
+  seenAchievements: [],
   streak: 0,
   lastActiveDay: null, // 'YYYY-MM-DD'
   hearts: null, // null = infinite for now (matches "бесконечность" seen in Coddy header)
@@ -44,6 +66,8 @@ const defaultState = {
   },
   settings: {
     confirmAnswers: true, // require a "Подтвердить" tap before grading a quiz answer
+    soundEnabled: true,
+    onboardingSeen: false,
   },
   missions: {
     date: null,
@@ -54,10 +78,16 @@ const defaultState = {
   dailyReward: {
     lastClaimedDate: null, // 'YYYY-MM-DD'
   },
-  inventory: {
-    owned: ['avatar-1', 'avatar-2', 'avatar-3', 'avatar-4', 'avatar-5', 'avatar-6', 'frame-none', 'theme-dark', 'theme-light'],
-    equipped: { avatar: 'avatar-1', frame: 'frame-none', theme: 'theme-dark' },
+  dailyTask: {
+    date: null,
+    taskId: null,
+    claimed: false,
   },
+  inventory: {
+    owned: ['avatar-1', 'avatar-2', 'avatar-3', 'avatar-4', 'avatar-5', 'avatar-6', 'frame-none', 'theme-dark', 'theme-light', 'hair-none', 'outfit-none'],
+    equipped: { avatar: 'avatar-1', frame: 'frame-none', theme: 'theme-dark', hair: 'hair-none', outfit: 'outfit-none' },
+  },
+  consumables: {}, // id -> count, e.g. { 'streak-freeze': 2 }
 };
 
 function loadState() {
@@ -71,6 +101,10 @@ function loadState() {
     merged.settings = { ...defaultState.settings, ...(parsed.settings || {}) };
     merged.missions = { ...structuredClone(defaultState.missions), ...(parsed.missions || {}) };
     merged.dailyReward = { ...structuredClone(defaultState.dailyReward), ...(parsed.dailyReward || {}) };
+    merged.dailyTask = { ...structuredClone(defaultState.dailyTask), ...(parsed.dailyTask || {}) };
+    merged.mistakes = Array.isArray(parsed.mistakes) ? parsed.mistakes : [];
+    merged.seenAchievements = Array.isArray(parsed.seenAchievements) ? parsed.seenAchievements : [];
+    merged.consumables = { ...(parsed.consumables || {}) };
     merged.inventory = {
       owned: (parsed.inventory && parsed.inventory.owned) ? Array.from(new Set([...defaultState.inventory.owned, ...parsed.inventory.owned])) : [...defaultState.inventory.owned],
       equipped: { ...defaultState.inventory.equipped, ...((parsed.inventory && parsed.inventory.equipped) || {}) },
@@ -86,7 +120,12 @@ let state = loadState();
 
 function save() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  // Cloud sync hooks itself in lazily to avoid a hard circular-import requirement;
+  // see main.js, which calls Store._setCloudPushHook() once cloudSync.js is loaded.
+  if (cloudPushHook) cloudPushHook();
 }
+
+let cloudPushHook = null;
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -101,6 +140,10 @@ function ensureDailyMissionsFresh() {
 }
 
 export const Store = {
+  _setCloudPushHook(fn) {
+    cloudPushHook = fn;
+  },
+
   get() {
     ensureDailyMissionsFresh();
     return state;
@@ -118,6 +161,9 @@ export const Store = {
     const yesterday = y.toISOString().slice(0, 10);
     if (state.lastActiveDay === yesterday) {
       state.streak += 1;
+    } else if (state.lastActiveDay && (state.consumables['streak-freeze'] || 0) > 0) {
+      // missed a day, but a streak freeze absorbs it — streak is preserved, not incremented
+      state.consumables['streak-freeze'] -= 1;
     } else {
       state.streak = 1;
     }
@@ -125,11 +171,122 @@ export const Store = {
     save();
   },
 
+  buyConsumable(item) {
+    const spend = item.currency === 'rubies' ? this.spendRubies(item.price) : this.spendCoins(item.price);
+    if (!spend) return { ok: false, reason: 'funds' };
+    state.consumables[item.id] = (state.consumables[item.id] || 0) + 1;
+    save();
+    return { ok: true };
+  },
+
+  getConsumableCount(id) {
+    return state.consumables[id] || 0;
+  },
+
+  exportData() {
+    return JSON.stringify(state, null, 2);
+  },
+
+  importData(jsonString) {
+    try {
+      const parsed = JSON.parse(jsonString);
+      if (typeof parsed !== 'object' || parsed === null || !('completedLessons' in parsed)) {
+        return { ok: false, reason: 'invalid' };
+      }
+      state = { ...structuredClone(defaultState), ...parsed };
+      save();
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, reason: 'parse' };
+    }
+  },
+
   addCoins(n) {
     ensureDailyMissionsFresh();
     state.coins += n;
     state.missions.progress.coins += n;
     save();
+  },
+
+  addXp(n) {
+    const before = levelForXp(state.xp).level;
+    state.xp += n;
+    const after = levelForXp(state.xp).level;
+    save();
+    return { leveledUp: after > before, newLevel: after };
+  },
+
+  checkNewAchievements() {
+    const newly = ACHIEVEMENTS.filter((a) => a.check(state) && !state.seenAchievements.includes(a.id));
+    if (newly.length) {
+      state.seenAchievements.push(...newly.map((a) => a.id));
+      save();
+    }
+    return newly;
+  },
+
+  getLevelInfo() {
+    return levelForXp(state.xp);
+  },
+
+  recordAnswer(isCorrect) {
+    if (isCorrect) {
+      state.comboStreak += 1;
+      if (state.comboStreak > state.bestCombo) state.bestCombo = state.comboStreak;
+      let bonusAwarded = 0;
+      if (state.comboStreak > 0 && state.comboStreak % COMBO_MILESTONE === 0) {
+        bonusAwarded = COMBO_BONUS_COINS;
+        this.addCoins(bonusAwarded);
+      }
+      save();
+      return { combo: state.comboStreak, bonusAwarded };
+    }
+    state.comboStreak = 0;
+    save();
+    return { combo: 0, bonusAwarded: 0 };
+  },
+
+  addMistake(entry) {
+    // avoid unbounded growth / duplicates of the exact same question text
+    state.mistakes = state.mistakes.filter((m) => m.question !== entry.question).slice(-29);
+    state.mistakes.push({ ...entry, addedAt: Date.now() });
+    save();
+  },
+
+  removeMistake(addedAt) {
+    state.mistakes = state.mistakes.filter((m) => m.addedAt !== addedAt);
+    save();
+  },
+
+  getMistakes() {
+    return state.mistakes;
+  },
+
+  getDailyTask() {
+    const today = todayStr();
+    if (state.dailyTask.date !== today || !state.dailyTask.taskId) {
+      if (PRACTICE_TASKS.length) {
+        // deterministic pick based on today's date so it's stable across reloads
+        let hash = 0;
+        for (let i = 0; i < today.length; i++) hash = (hash * 31 + today.charCodeAt(i)) >>> 0;
+        const idx = hash % PRACTICE_TASKS.length;
+        state.dailyTask = { date: today, taskId: PRACTICE_TASKS[idx].id, claimed: false };
+        save();
+      }
+    }
+    return state.dailyTask;
+  },
+
+  isDailyTask(taskId) {
+    return this.getDailyTask().taskId === taskId;
+  },
+
+  claimDailyTaskBonus() {
+    const dt = this.getDailyTask();
+    if (dt.claimed) return false;
+    state.dailyTask.claimed = true;
+    save();
+    return true;
   },
 
   spendCoins(n) {
@@ -164,9 +321,12 @@ export const Store = {
       bestAccuracy: prev ? Math.max(prev.bestAccuracy || 0, accuracy) : accuracy,
     };
     this.addCoins(coinsEarned);
+    const xpResult = this.addXp(coinsEarned);
     this.touchStreak();
     if (isNew) state.missions.progress.lessons += 1;
     save();
+    const newAchievements = this.checkNewAchievements();
+    return { leveledUp: xpResult.leveledUp, newLevel: xpResult.newLevel, newAchievements };
   },
 
   isLessonDone(lessonId) {
@@ -206,8 +366,18 @@ export const Store = {
       solvedAt: Date.now(),
       attempts: prev.attempts + 1,
     };
-    if (isNew) state.missions.progress.practice += 1;
+    if (isNew) {
+      state.missions.progress.practice += 1;
+      this.addXp(5);
+    }
+    let dailyBonus = 0;
+    if (isNew && this.isDailyTask(taskId) && !state.dailyTask.claimed) {
+      dailyBonus = 15;
+      state.dailyTask.claimed = true;
+      this.addRubies(dailyBonus);
+    }
     save();
+    return { isNew, dailyBonus };
   },
 
   isPracticeDone(taskId) {
@@ -308,6 +478,40 @@ export const Store = {
 
   getEquipped() {
     return state.inventory.equipped;
+  },
+
+  // --- Chests ---
+  openChest(chest) {
+    const spend = chest.currency === 'rubies' ? this.spendRubies(chest.price) : this.spendCoins(chest.price);
+    if (!spend) return { ok: false, reason: 'funds' };
+
+    // weighted rarity pick
+    const roll = Math.random() * 100;
+    let acc = 0;
+    let picked = Object.keys(chest.odds)[0];
+    for (const [rarity, pct] of Object.entries(chest.odds)) {
+      acc += pct;
+      if (roll < acc) { picked = rarity; break; }
+    }
+
+    const categories = ['avatar', 'frame', 'theme'];
+    const category = categories[Math.floor(Math.random() * categories.length)];
+    const candidates = SHOP_ITEMS.filter((i) => i.category === category && i.rarity === picked && !this.ownsItem(i.id));
+
+    if (candidates.length === 0) {
+      // already own everything of that rarity/category — compensate with currency instead
+      const compTable = { common: 10, rare: 25, epic: 60, legendary: 20, mythical: 45 };
+      const compCurrency = (picked === 'legendary' || picked === 'mythical') ? 'rubies' : 'coins';
+      const amount = compTable[picked] || 10;
+      if (compCurrency === 'rubies') this.addRubies(amount); else this.addCoins(amount);
+      save();
+      return { ok: true, compensation: { currency: compCurrency, amount }, rarity: picked };
+    }
+
+    const item = candidates[Math.floor(Math.random() * candidates.length)];
+    state.inventory.owned.push(item.id);
+    save();
+    return { ok: true, item };
   },
 
   reset() {

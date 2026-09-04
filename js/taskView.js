@@ -1,6 +1,9 @@
 import { el, ICONS, mdBold } from './utils.js';
 import { runQuery, resultsMatch } from './sqlEngine.js';
 import { openAiAssistant } from './aiAssistant.js';
+import { Store } from './state.js';
+
+const DEEP_HINT_PRICE = 5;
 
 const REFERENCE = [
   { term: 'SELECT', desc: 'Выбирает столбцы, которые нужно получить из таблицы.' },
@@ -28,6 +31,15 @@ function renderMiniTable(columns, rows, max = 5) {
     wrap.appendChild(el('div', { class: 'row-note' }, `Всего ${rows.length} строк(и)`));
   }
   return wrap;
+}
+
+function missingKeywords(query, requiredKeywords) {
+  if (!requiredKeywords || !requiredKeywords.length) return [];
+  return requiredKeywords.filter((kw) => {
+    const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`\\b${escaped}\\b`, 'i');
+    return !re.test(query);
+  });
 }
 
 /**
@@ -99,6 +111,22 @@ export function renderTaskView(container, task, { onSolved } = {}) {
       const hintBtn = el('button', { class: 'hint-btn', onclick: () => hintBtn.nextSibling ? null : hintBtn.after(el('div', { style: 'margin-top:10px;color:var(--text-dim);font-size:13.5px;' }, task.hint)) },
         [htmlIcon(ICONS.bot), 'Подсказка']);
       wrap.appendChild(hintBtn);
+
+      const deepHintBtn = el('button', { class: 'hint-btn', style: 'margin-top:8px;margin-left:10px;color:var(--amber);' },
+        [htmlIcon(ICONS.coin), `Полное решение · ${DEEP_HINT_PRICE}`]);
+      deepHintBtn.addEventListener('click', () => {
+        if (deepHintBtn.dataset.revealed) return;
+        if (!Store.spendCoins(DEEP_HINT_PRICE)) {
+          const oldText = deepHintBtn.textContent;
+          deepHintBtn.textContent = 'Не хватает монет';
+          setTimeout(() => { deepHintBtn.innerHTML = ''; deepHintBtn.append(htmlIcon(ICONS.coin), `Полное решение · ${DEEP_HINT_PRICE}`); }, 1200);
+          return;
+        }
+        deepHintBtn.dataset.revealed = '1';
+        deepHintBtn.after(el('div', { class: 'code-block', style: 'margin-top:10px;' }, task.solutionQuery));
+        deepHintBtn.remove();
+      });
+      wrap.appendChild(deepHintBtn);
     }
     return wrap;
   }
@@ -212,17 +240,43 @@ export function renderTaskView(container, task, { onSolved } = {}) {
       expectedColWrap.appendChild(renderMiniTable(expectedRes.columns, expectedRes.rows));
 
       const match = resultsMatch(userRes, expectedRes);
-      if (match) {
+      const missing = match ? missingKeywords(currentCode, task.requiredKeywords) : [];
+      if (match && missing.length) {
+        errorCount++;
+        runResult.appendChild(el('div', { class: 'run-result' }, [
+          el('div', { class: 'result-err' }, ['✕ Результат верный, но задача требует использовать определённые ключевые слова']),
+          el('div', { style: 'font-size:13px;color:var(--text-dim);margin-top:4px;' },
+            `Не хватает: ${missing.join(', ')}. Это итоговая задача главы — нужно применить все пройденные темы в одном запросе.`),
+        ]));
+      } else if (match) {
         runResult.appendChild(el('div', { class: 'run-result' }, [
           el('div', { class: 'result-ok' }, ['✓ Правильно! Все тестовые случаи пройдены.']),
         ]));
+        if (task.hint) {
+          runResult.appendChild(el('div', {
+            style: 'margin:8px 0;padding:12px 14px;background:var(--bg-elev-2);border-radius:10px;font-size:13px;color:var(--text-dim);line-height:1.5;',
+          }, [
+            el('div', { style: 'font-weight:700;color:var(--teal);margin-bottom:4px;font-size:12px;' }, 'Почему это работает'),
+            task.hint,
+          ]));
+        }
         if (!solved) {
           solved = true;
-          runResult.appendChild(el('button', {
+          const continueBtn = el('button', {
             class: 'btn-primary',
             style: 'margin-top:4px;',
-            onclick: () => onSolved && onSolved(errorCount),
-          }, 'Продолжить'));
+            onclick: () => {
+              const result = onSolved && onSolved(errorCount);
+              if (result && result.dailyBonus) {
+                continueBtn.replaceWith(el('div', { class: 'coin-banner', style: 'background:rgba(224,84,107,.12);border-color:rgba(224,84,107,.35);color:#e0546b;' },
+                  `🎉 Задача дня! +${result.dailyBonus} рубинов`));
+              } else {
+                continueBtn.disabled = true;
+                continueBtn.textContent = 'Готово';
+              }
+            },
+          }, 'Продолжить');
+          runResult.appendChild(continueBtn);
         }
       } else {
         errorCount++;

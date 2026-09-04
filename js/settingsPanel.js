@@ -1,5 +1,7 @@
 import { el, ICONS } from './utils.js';
 import { Store } from './state.js';
+import { isSupabaseConfigured, getSupabaseConfig, configureSupabase, disconnectSupabase } from './supabaseClient.js';
+import { getSession, signUp, signIn, signOut, pushProgress, pullProgress, applyCloudState, setSyncEnabled } from './cloudSync.js';
 
 function htmlIcon(svg) {
   const span = el('span', { style: 'display:flex' });
@@ -20,7 +22,115 @@ export function openSettings({ onClose } = {}) {
   body.appendChild(nameBlock());
   body.appendChild(quizConfirmBlock());
   body.appendChild(aiSettingsBlock());
+  body.appendChild(accountBlock());
+  body.appendChild(dataBlock());
   body.appendChild(updateSiteBlock());
+}
+
+function accountBlock() {
+  const block = el('div', { class: 'section-block', style: 'margin:0 0 20px;' }, [
+    el('h3', {}, 'Облачный аккаунт (Supabase)'),
+  ]);
+  const host = el('div');
+  block.appendChild(host);
+
+  function renderNotConfigured() {
+    host.innerHTML = '';
+    host.appendChild(el('div', { style: 'font-size:12.5px;color:var(--text-faint);margin-bottom:12px;line-height:1.5;' },
+      'Подключите свой Supabase-проект, чтобы прогресс сохранялся в облаке и не терялся при очистке кэша или смене телефона.'));
+    const urlInput = el('input', { class: 'ai-input', style: 'width:100%;margin-bottom:8px;', placeholder: 'https://xxxxx.supabase.co' });
+    const keyInput = el('input', { class: 'ai-input', style: 'width:100%;margin-bottom:10px;', placeholder: 'anon public ключ' });
+    const btn = el('button', { class: 'btn-primary' }, 'Подключить');
+    btn.addEventListener('click', () => {
+      if (!urlInput.value.trim() || !keyInput.value.trim()) return;
+      configureSupabase(urlInput.value, keyInput.value);
+      renderState();
+    });
+    host.append(urlInput, keyInput, btn);
+  }
+
+  function renderLoggedOut() {
+    host.innerHTML = '';
+    const emailInput = el('input', { class: 'ai-input', style: 'width:100%;margin-bottom:8px;', type: 'email', placeholder: 'Email' });
+    const passInput = el('input', { class: 'ai-input', style: 'width:100%;margin-bottom:10px;', type: 'password', placeholder: 'Пароль (минимум 6 символов)' });
+    const msg = el('div', { style: 'font-size:12.5px;margin-bottom:8px;min-height:16px;' });
+
+    const signInBtn = el('button', { class: 'btn-primary', style: 'margin-bottom:8px;' }, 'Войти');
+    const signUpBtn = el('button', { class: 'btn-secondary' }, 'Зарегистрироваться');
+
+    async function afterLogin() {
+      setSyncEnabled(true);
+      msg.style.color = 'var(--text-faint)';
+      msg.textContent = 'Проверяем облачный прогресс…';
+      const cloud = await pullProgress();
+      if (cloud.ok && cloud.state) {
+        if (confirm('В облаке уже есть сохранённый прогресс. Загрузить его и заменить текущий на этом устройстве?')) {
+          applyCloudState(cloud.state);
+        } else {
+          await pushProgress();
+        }
+      } else {
+        await pushProgress();
+      }
+      renderState();
+    }
+
+    signInBtn.addEventListener('click', async () => {
+      msg.style.color = 'var(--text-faint)'; msg.textContent = 'Входим…';
+      const res = await signIn(emailInput.value.trim(), passInput.value);
+      if (res.ok) { await afterLogin(); } else { msg.style.color = 'var(--coral)'; msg.textContent = res.error; }
+    });
+    signUpBtn.addEventListener('click', async () => {
+      msg.style.color = 'var(--text-faint)'; msg.textContent = 'Регистрируем…';
+      const res = await signUp(emailInput.value.trim(), passInput.value);
+      if (res.ok) {
+        msg.style.color = 'var(--green)';
+        msg.textContent = 'Готово! Если Supabase просит подтвердить email — проверьте почту, потом войдите.';
+      } else { msg.style.color = 'var(--coral)'; msg.textContent = res.error; }
+    });
+
+    host.append(emailInput, passInput, msg, signInBtn, signUpBtn);
+
+    const disconnectRow = el('div', { style: 'margin-top:14px;color:var(--text-faint);font-size:12px;cursor:pointer;text-decoration:underline;' }, 'Отключить Supabase от этого сайта');
+    disconnectRow.addEventListener('click', () => { disconnectSupabase(); setSyncEnabled(false); renderState(); });
+    host.appendChild(disconnectRow);
+  }
+
+  async function renderLoggedIn(session) {
+    host.innerHTML = '';
+    host.append(
+      el('div', { class: 'task-card', style: 'margin:0 0 12px;' }, [
+        el('div', { class: 'task-icon', style: 'background:var(--teal-dim);color:#eafffb;' }, htmlIcon(ICONS.check)),
+        el('div', { class: 'task-body' }, [
+          el('div', { class: 'task-title' }, session.user.email),
+          el('div', { class: 'task-meta' }, 'Прогресс синхронизируется автоматически'),
+        ]),
+      ]),
+    );
+    const syncBtn = el('button', { class: 'btn-secondary' }, 'Синхронизировать сейчас');
+    const signOutBtn = el('button', { class: 'btn-secondary', style: 'color:var(--coral);border-color:var(--coral);' }, 'Выйти');
+    syncBtn.addEventListener('click', async () => {
+      syncBtn.textContent = 'Синхронизация…';
+      await pushProgress();
+      syncBtn.textContent = 'Готово ✓';
+      setTimeout(() => { syncBtn.textContent = 'Синхронизировать сейчас'; }, 1500);
+    });
+    signOutBtn.addEventListener('click', async () => {
+      await signOut();
+      setSyncEnabled(false);
+      renderState();
+    });
+    host.append(syncBtn, signOutBtn);
+  }
+
+  async function renderState() {
+    if (!isSupabaseConfigured()) { renderNotConfigured(); return; }
+    const session = await getSession();
+    if (session) { renderLoggedIn(session); } else { renderLoggedOut(); }
+  }
+
+  renderState();
+  return block;
 }
 
 function nameBlock() {
@@ -54,13 +164,28 @@ function quizConfirmBlock() {
     ]),
     toggle,
   ]));
+
+  const soundToggle = el('div', { class: `toggle-switch ${s.settings.soundEnabled ? 'on' : ''}` }, el('div', { class: 'knob' }));
+  soundToggle.addEventListener('click', () => {
+    const cur = Store.get().settings.soundEnabled;
+    Store.setSettings({ soundEnabled: !cur });
+    soundToggle.classList.toggle('on', !cur);
+  });
+  block.appendChild(el('div', { class: 'toggle-row' }, [
+    el('div', {}, [
+      el('div', { class: 'toggle-label' }, 'Звук и вибрация'),
+      el('div', { class: 'toggle-desc' }, 'Короткий сигнал и вибрация при ответе в тесте.'),
+    ]),
+    soundToggle,
+  ]));
+
   return block;
 }
 
 function aiSettingsBlock() {
   const s = Store.get();
   const block = el('div', { class: 'section-block', style: 'margin:0 0 20px;' }, [
-    el('h3', {}, 'ИИ-ассистент Bugsy'),
+    el('h3', {}, 'ИИ-ассистент Индекс'),
   ]);
 
   const modeRow = el('div', { class: 'chip-row', style: 'padding:0 0 12px;' });
@@ -108,10 +233,70 @@ function aiSettingsBlock() {
   return block;
 }
 
+function dataBlock() {
+  const block = el('div', { class: 'section-block', style: 'margin:0 0 20px;' }, [
+    el('h3', {}, 'Данные'),
+    el('div', { style: 'font-size:12.5px;color:var(--text-faint);margin-bottom:12px;line-height:1.5;' },
+      'Весь прогресс хранится только в этом браузере. Если очистить кэш или сменить телефон — данные пропадут без сохранённого файла.'),
+  ]);
+
+  const exportBtn = el('button', { class: 'btn-secondary' }, 'Скачать файл прогресса');
+  exportBtn.addEventListener('click', () => {
+    const json = Store.exportData();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = el('a', { href: url, download: `querypath-progress-${new Date().toISOString().slice(0, 10)}.json` });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+  block.appendChild(exportBtn);
+
+  const importLabel = el('label', { class: 'btn-secondary', style: 'display:block;text-align:center;cursor:pointer;' }, 'Загрузить файл прогресса');
+  const fileInput = el('input', { type: 'file', accept: 'application/json', style: 'display:none;' });
+  const statusMsg = el('div', { style: 'font-size:12.5px;margin-top:8px;text-align:center;' });
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = Store.importData(reader.result);
+      if (result.ok) {
+        statusMsg.style.color = 'var(--green)';
+        statusMsg.textContent = 'Прогресс загружен! Перезагружаем…';
+        setTimeout(() => location.reload(), 800);
+      } else {
+        statusMsg.style.color = 'var(--coral)';
+        statusMsg.textContent = 'Не удалось прочитать файл — убедитесь, что это файл прогресса QueryPath.';
+      }
+    };
+    reader.readAsText(file);
+  });
+  importLabel.appendChild(fileInput);
+  block.appendChild(importLabel);
+  block.appendChild(statusMsg);
+
+  return block;
+}
+
 function updateSiteBlock() {
   const block = el('div', { class: 'section-block', style: 'margin:0 0 20px;' }, [
     el('h3', {}, 'Сайт'),
   ]);
+
+  const helpRow = el('div', { class: 'toggle-row', style: 'cursor:pointer;' }, [
+    el('div', {}, [
+      el('div', { class: 'toggle-label' }, 'Как это работает?'),
+      el('div', { class: 'toggle-desc' }, 'Ещё раз показать краткое приветствие про монеты, рубины, стрик и уровень.'),
+    ]),
+    el('div', { style: 'color:var(--teal);font-weight:700;font-size:13px;flex-shrink:0;' }, 'Показать'),
+  ]);
+  helpRow.addEventListener('click', async () => {
+    const { openOnboarding } = await import('./onboarding.js');
+    openOnboarding({});
+  });
+  block.appendChild(helpRow);
 
   const row = el('div', { class: 'toggle-row', style: 'cursor:pointer;' }, [
     el('div', {}, [

@@ -4,7 +4,7 @@ import { Store } from './state.js';
 // See /ai-worker.js for the Cloudflare Worker that this proxy mode expects.
 // It receives {messages, system} and returns {reply}.
 
-const SYSTEM_PROMPT_BASE = `Ты — Багси, дружелюбный ИИ-репетитор по SQL внутри учебного приложения QueryPath.
+const SYSTEM_PROMPT_BASE = `Ты — Индекс, дружелюбный ИИ-репетитор по SQL внутри учебного приложения QueryPath.
 Ты видишь условие текущей задачи и SQL-код, который сейчас написал ученик.
 Правила:
 - Не давай готовое решение целиком, если тебя явно не попросили "дай решение" или "покажи ответ".
@@ -61,9 +61,9 @@ export function openAiAssistant({ taskTitle, taskDescription, getCode }) {
 
   const sheet = el('div', { class: 'ai-sheet' });
   const head = el('div', { class: 'ai-head' }, [
-    el('div', { class: 'ai-avatar' }, '🐞'),
+    el('div', { class: 'ai-avatar' }, '🔎'),
     el('div', {}, [
-      el('div', { class: 'name' }, 'Bugsy'),
+      el('div', { class: 'name' }, 'Индекс'),
       el('div', { class: 'sub' }, 'Ваш ИИ-репетитор'),
     ]),
     el('button', { class: 'icon-btn', style: 'margin-left:auto', onclick: () => close() }, htmlIcon(ICONS.close)),
@@ -71,7 +71,7 @@ export function openAiAssistant({ taskTitle, taskDescription, getCode }) {
 
   const messagesEl = el('div', { class: 'ai-messages' });
   const inputRow = el('div', { class: 'ai-input-row' });
-  const input = el('input', { class: 'ai-input', placeholder: 'Спросите Bugsy…' });
+  const input = el('input', { class: 'ai-input', placeholder: 'Спросите Индекса…' });
   const sendBtn = el('button', { class: 'ai-send' }, htmlIcon(ICONS.send));
   inputRow.append(input, sendBtn);
 
@@ -82,8 +82,8 @@ export function openAiAssistant({ taskTitle, taskDescription, getCode }) {
     sheet.append(
       el('div', { class: 'ai-key-notice' },
         settings.mode === 'byok'
-          ? 'Чтобы включить Bugsy, добавьте свой Anthropic API-ключ в настройках профиля.'
-          : 'Чтобы включить Bugsy, укажите адрес вашего прокси-сервера (Cloudflare Worker) в настройках профиля — см. /ai-worker.js в проекте.')
+          ? 'Чтобы включить Индекса, добавьте свой Anthropic API-ключ в настройках профиля.'
+          : 'Чтобы включить Индекса, укажите адрес вашего прокси-сервера (Cloudflare Worker) в настройках профиля — см. /ai-worker.js в проекте.')
     );
   } else {
     sheet.append(inputRow);
@@ -94,7 +94,7 @@ export function openAiAssistant({ taskTitle, taskDescription, getCode }) {
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
-  addMsg('bot', 'Привет, я Bugsy! Я вижу вашу задачу и код. Спросите — объясню понятие, найду ошибку или подскажу шаг.');
+  addMsg('bot', 'Привет, я Индекс! Я вижу вашу задачу и код. Спросите — объясню понятие, найду ошибку или подскажу шаг.');
 
   async function send(text) {
     if (!text.trim()) return;

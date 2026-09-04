@@ -1,6 +1,9 @@
 import { el, ICONS } from './utils.js';
 import { Store } from './state.js';
 import { renderTopbar } from './topbar.js';
+import { getPracticeTask } from '../data/practice.js';
+import { openPracticeTask } from './practiceTaskOverlay.js';
+import { openMistakesReview } from './mistakesReview.js';
 
 function htmlIcon(svg) {
   const span = el('span');
@@ -22,6 +25,51 @@ function coinLabel(n) {
   ]);
 }
 
+function dailyTaskBlock(container) {
+  const block = el('div', { class: 'section-block' }, [el('h3', {}, 'Задача дня')]);
+  const dt = Store.getDailyTask();
+  const task = getPracticeTask(dt.taskId);
+  if (!task) return block;
+
+  const solved = Store.isPracticeDone(task.id);
+  const card = el('div', { class: `task-card ${solved ? 'solved' : ''}`, style: 'border-color:var(--amber);' }, [
+    el('div', { class: 'task-icon', style: 'background:var(--amber);color:#2c1e04;' }, htmlIcon(solved ? ICONS.check : ICONS.dumbbell)),
+    el('div', { class: 'task-body' }, [
+      el('div', { class: 'task-title' }, task.title),
+      el('div', { class: 'task-meta', style: 'display:flex;align-items:center;gap:4px;' }, [
+        dt.claimed ? 'Бонус получен' : 'Награда за решение: ',
+        dt.claimed ? null : rubyLabel(15),
+      ]),
+    ]),
+  ]);
+  card.style.cursor = 'pointer';
+  card.addEventListener('click', () => {
+    openPracticeTask(task, { onClose: () => renderMissionsPage(container) });
+  });
+  block.appendChild(card);
+  return block;
+}
+
+function mistakesEntryBlock(container) {
+  const block = el('div', { class: 'section-block' }, [el('h3', {}, 'Работа над ошибками')]);
+  const count = Store.getMistakes().length;
+  const card = el('div', { class: 'task-card' }, [
+    el('div', { class: 'task-icon' }, htmlIcon(ICONS.flag)),
+    el('div', { class: 'task-body' }, [
+      el('div', { class: 'task-title' }, count ? `${count} вопрос(ов) на повторение` : 'Пока нет ошибок для повторения'),
+      el('div', { class: 'task-meta' }, 'Вопросы, где вы ошиблись в тестах — пересдайте их здесь'),
+    ]),
+  ]);
+  if (count) {
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', () => openMistakesReview({ onClose: () => renderMissionsPage(container) }));
+  } else {
+    card.style.opacity = '.6';
+  }
+  block.appendChild(card);
+  return block;
+}
+
 export function renderMissionsPage(container) {
   container.innerHTML = '';
   container.appendChild(renderTopbar());
@@ -29,6 +77,8 @@ export function renderMissionsPage(container) {
   container.appendChild(el('div', { class: 'page-sub' }, 'Ежедневные задания и награда за вход — обновляются каждый день.'));
 
   container.appendChild(dailyRewardBlock());
+  container.appendChild(dailyTaskBlock(container));
+  container.appendChild(mistakesEntryBlock(container));
   container.appendChild(missionsListBlock());
 
   container.appendChild(el('div', { style: 'height:20px;' }));
