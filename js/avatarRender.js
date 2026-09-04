@@ -30,19 +30,19 @@ const OUTFIT_ACCENT_CLASS = {
 };
 
 /**
- * Builds a DOM node for the equipped avatar: base body circle + outfit shape +
- * hair shape, clipped to a circle. No facial features by design.
+ * Builds a DOM node for the equipped avatar: a head (circle) + torso/shoulders
+ * (widening shape below) — a bust silhouette, not a single flat colored circle.
+ * Hair sits on the head, outfit sits on the torso. No facial features by design.
  * equipped: { avatar, hair, outfit, frame } item ids (frame handled by caller via avatar-shell class)
  */
 export function buildAvatarNode(equipped) {
   const body = getItem(equipped.avatar) || getItem('avatar-1');
   const hair = getItem(equipped.hair) || getItem('hair-none');
   const outfit = getItem(equipped.outfit) || getItem('outfit-none');
+  const bodyGradient = `linear-gradient(135deg, ${body.colors[0]}, ${body.colors[1]})`;
 
-  const bodyEl = el('div', {
-    class: 'avatar',
-    style: `background:linear-gradient(135deg, ${body.colors[0]}, ${body.colors[1]});margin:0;width:100%;height:100%;`,
-  });
+  // --- Torso (shoulders/chest) — bare skin tone underneath, clothing drawn on top ---
+  const torsoBaseEl = el('div', { class: 'avatar-torso-base', style: `background:${bodyGradient};` });
 
   const outfitEl = el('div', { class: `avatar-outfit avatar-outfit-${outfit.style || 'none'}` });
   if (outfit.style && outfit.style !== 'none') {
@@ -50,13 +50,18 @@ export function buildAvatarNode(equipped) {
       || (outfit.accent ? 'conic-gradient(from 0deg,#ef6f6c,#f2b84b,#5cd68a,#4fd8c8,#8b8ff0,#ef6f6c)' : 'var(--teal)');
   }
 
-  const outfitParts = [outfitEl];
+  const torsoParts = [torsoBaseEl, outfitEl];
   const accentClass = OUTFIT_ACCENT_CLASS[outfit.style];
   if (accentClass) {
     const accentEl = el('div', { class: accentClass });
     accentEl.style.background = outfit.accent || 'rgba(255,255,255,.75)';
-    outfitParts.push(accentEl);
+    torsoParts.push(accentEl);
   }
+  const torsoWrap = el('div', { class: 'avatar-torso-wrap' }, torsoParts);
+
+  // --- Head — hair is nested inside so its existing % -based CSS automatically
+  // scales/repositions to the smaller head box, no changes needed to hair CSS. ---
+  const headEl = el('div', { class: 'avatar-head', style: `background:${bodyGradient};` });
 
   const hairStyle = hair.style || 'none';
   const hairColorCss = hair.color
@@ -79,7 +84,11 @@ export function buildAvatarNode(equipped) {
     if (hairColorCss) hairEl.style.background = hairColorCss;
   }
 
-  return el('div', { class: 'avatar-clip' }, [bodyEl, ...outfitParts, hairEl]);
+  const headWrap = el('div', { class: 'avatar-head-wrap' }, [headEl, hairEl]);
+
+  // Torso painted first (behind), head+hair painted after so the head slightly
+  // overlaps the torso's top edge — reads as a neck connection, not two floating shapes.
+  return el('div', { class: 'avatar-clip' }, [torsoWrap, headWrap]);
 }
 
 /**
