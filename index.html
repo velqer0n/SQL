@@ -4,13 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>QueryPath — учи SQL на практике</title>
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=5">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
-<div id="app"></div>
+<div id="app">
+  <div class="skeleton-loader">
+    <div class="skeleton-bar" style="width:60%;height:14px;margin-bottom:20px;"></div>
+    <div class="skeleton-bar" style="width:100%;height:80px;border-radius:14px;margin-bottom:16px;"></div>
+    <div class="skeleton-hex"></div>
+  </div>
+</div>
 
 <nav id="bottom-nav" class="bottom-nav">
   <button class="nav-btn" data-route="path">
@@ -21,6 +27,14 @@
     <svg class="nav-icon" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0-1.4 0L6.3 13.3a1 1 0 0 0 0 1.4l3 3a1 1 0 0 0 1.4 0l7-7a1 1 0 0 0 0-1.4l-3-3zM4 20l1.5-4L9 19.5 5 21z"/></svg>
     <span>Практика</span>
   </button>
+  <button class="nav-btn" data-route="shop">
+    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 8l1.5-4h13L20 8M4 8h16M4 8v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V8M9 12a3 3 0 0 0 6 0"/></svg>
+    <span>Магазин</span>
+  </button>
+  <button class="nav-btn" data-route="missions">
+    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4M21 12v7a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h13"/></svg>
+    <span>Миссии</span>
+  </button>
   <button class="nav-btn" data-route="profile">
     <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
     <span>Профиль</span>
@@ -28,6 +42,21 @@
 </nav>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
-<script type="module" src="js/main.js?v=3"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script type="module">
+  import('./js/main.js?v=5').catch((err) => {
+    console.error('Failed to load app modules:', err);
+    const app = document.getElementById('app');
+    if (app) {
+      app.innerHTML = `
+        <div style="padding:60px 24px;text-align:center;color:#e9ebf3;font-family:sans-serif;">
+          <div style="font-size:40px;margin-bottom:16px;">⚠️</div>
+          <div style="font-size:16px;font-weight:700;margin-bottom:8px;">Не удалось загрузить приложение</div>
+          <div style="font-size:13.5px;color:#9aa1b8;margin-bottom:20px;">Возможно, обновилась версия сайта, а браузер закэшировал старые файлы.</div>
+          <button onclick="location.href = location.pathname + '?v=' + Date.now()" style="padding:13px 22px;border-radius:10px;border:none;background:#4fd8c8;color:#0b1f1c;font-weight:800;font-size:14px;">Обновить страницу</button>
+        </div>`;
+    }
+  });
+</script>
 </body>
 </html>

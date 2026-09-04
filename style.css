@@ -46,6 +46,7 @@ code, .mono{font-family:var(--font-mono);}
   background:linear-gradient(180deg, var(--bg) 70%, transparent);
   z-index:20;
 }
+.stat-pill.clickable{cursor:pointer;}
 .stat-pill{
   display:flex;
   align-items:center;
@@ -74,15 +75,17 @@ code, .mono{font-family:var(--font-mono);}
   display:flex;
   flex-direction:column;
   align-items:center;
-  gap:3px;
-  padding:6px 0;
+  gap:2px;
+  padding:5px 0;
   color:var(--text-faint);
-  font-size:11.5px;
+  font-size:9.5px;
   font-weight:600;
   border-radius:10px;
+  min-width:0;
 }
+.nav-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
 .nav-btn.active{color:var(--teal);}
-.nav-icon{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;}
+.nav-icon{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;flex-shrink:0;}
 .nav-btn.active .nav-icon{fill:currentColor;stroke:none;}
 
 /* ---------- Section header on path ---------- */
@@ -150,6 +153,29 @@ code, .mono{font-family:var(--font-mono);}
 }
 .hex-btn.checkpoint{background:var(--amber);color:#2c1e04;}
 .hex-btn.checkpoint.done{background:var(--amber);color:#2c1e04;}
+.hex-btn.open{box-shadow: inset 0 0 0 1.5px rgba(79,216,200,.4);}
+.hex-btn.checkpoint.open{box-shadow: inset 0 0 0 2px rgba(242,184,75,.5);}
+
+/* ---------- Module & lesson title typography ---------- */
+.module-divider{
+  display:flex;align-items:center;gap:10px;
+  margin:22px 0 14px;padding:0 10px;
+}
+.module-divider-line{flex:1;height:1px;background:linear-gradient(90deg, transparent, var(--line) 30%, var(--line) 70%, transparent);}
+.module-divider-text{
+  font-size:15px;font-weight:800;color:var(--teal);
+  letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;
+  flex-shrink:0;
+}
+.lesson-row-title{
+  font-size:13.5px;color:var(--text);font-weight:700;
+  text-align:center;margin-bottom:4px;
+  padding:3px 12px;
+}
+.checkpoint-title{
+  color:var(--amber);font-size:12.5px;letter-spacing:.03em;
+  text-transform:uppercase;font-weight:800;
+}
 
 /* ---------- Toggle switch (settings) ---------- */
 .toggle-row{
@@ -612,31 +638,46 @@ body.theme-nebula{
 /* ==================== Avatar with equipped colors + frame ==================== */
 .avatar-shell{position:relative;width:76px;height:76px;margin-bottom:12px;}
 .avatar-shell .avatar{width:100%;height:100%;margin:0;}
-.avatar-shell.frame-ring::after{
+.avatar-shell.frame-rarity-common::after{
+  content:'';position:absolute;inset:-4px;border-radius:50%;
+  border:2.5px solid var(--frame-color, var(--teal));
+}
+.avatar-shell.frame-rarity-rare::after{
   content:'';position:absolute;inset:-5px;border-radius:50%;
   border:3px solid var(--frame-color, var(--teal));
+  box-shadow:0 0 8px 0 var(--frame-color, var(--teal));
 }
-.avatar-shell.frame-double::after{
+.avatar-shell.frame-rarity-epic::after{
   content:'';position:absolute;inset:-6px;border-radius:50%;
   border:2px solid var(--frame-color, var(--violet));
-  box-shadow:0 0 0 4px transparent, inset 0 0 0 2px var(--frame-color, var(--violet));
+  box-shadow:inset 0 0 0 2px var(--frame-color, var(--violet)), 0 0 10px 1px var(--frame-color, var(--violet));
 }
-.avatar-shell.frame-gem::after{
-  content:'';position:absolute;inset:-6px;border-radius:50%;
+.avatar-shell.frame-rarity-legendary::after{
+  content:'';position:absolute;inset:-7px;border-radius:50%;
   border:3px solid var(--frame-color, var(--amber));
-  box-shadow:0 0 12px 1px var(--frame-color, var(--amber));
+  box-shadow:0 0 16px 3px var(--frame-color, var(--amber)), inset 0 0 8px 0 var(--frame-color, var(--amber));
 }
-.avatar-shell.frame-rainbow::after{
-  content:'';position:absolute;inset:-6px;border-radius:50%;
+.avatar-shell.frame-rarity-mythical::after{
+  content:'';position:absolute;inset:-7px;border-radius:50%;
   border:3px solid transparent;
   background:linear-gradient(#0000,#0000) padding-box, conic-gradient(from 0deg,#ef6f6c,#f2b84b,#5cd68a,#4fd8c8,#8b8ff0,#ef6f6c) border-box;
   -webkit-mask:linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
   mask:linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite:xor; mask-composite:exclude;
+  animation: rotate-hue 4s linear infinite;
+  box-shadow:0 0 14px 2px rgba(239,111,108,.5);
 }
+@keyframes rotate-hue{ from{filter:hue-rotate(0deg);} to{filter:hue-rotate(360deg);} }
 
 /* small avatar chip used in shop grid */
 .avatar-chip{width:48px;height:48px;border-radius:50%;flex-shrink:0;}
+
+/* shop preview icon rarity flourish (frames/avatars/themes) */
+.shop-item-icon.rarity-rare{box-shadow:0 0 6px 0 rgba(79,216,200,.4);}
+.shop-item-icon.rarity-epic{box-shadow:0 0 10px 1px rgba(139,143,240,.5);}
+.shop-item-icon.rarity-legendary{box-shadow:0 0 14px 2px rgba(242,184,75,.55);}
+.shop-item-icon.rarity-mythical{box-shadow:0 0 14px 2px rgba(239,111,108,.55);animation:rotate-hue 4s linear infinite;}
+
 
 /* ==================== Shop ==================== */
 .shop-tabs{display:flex;border-bottom:1px solid var(--line);padding:0 12px;position:sticky;top:0;background:var(--bg);z-index:5;}
@@ -672,3 +713,153 @@ body.theme-nebula{
 }
 .shop-currency{display:flex;align-items:center;gap:6px;font-weight:800;font-size:15px;}
 .shop-currency svg{width:18px;height:18px;}
+
+/* ==================== Theme accent layers (stack on top of dark/light base) ==================== */
+body.accent-mint{--teal:#4fd6a0; --teal-dim:#245c47;}
+body.accent-plum{--teal:#c084c0; --teal-dim:#5c2d5c;}
+body.accent-sky{--teal:#4fb4e0; --teal-dim:#204d63;}
+body.accent-violet{--teal:#8b8ff0; --teal-dim:#3d3d7a;}
+body.accent-rose{--teal:#ef6f9c; --teal-dim:#6e2e46;}
+body.accent-gold{--teal:#d9a53a; --teal-dim:#5c471a;}
+body.accent-coral{--teal:#ef8f6f; --teal-dim:#6e3a2a;}
+body.accent-lime{--teal:#a3d64f; --teal-dim:#4a5c24;}
+body.accent-azure{--teal:#4f7fe0; --teal-dim:#243a63;}
+body.accent-amber2{--teal:#e0b84f; --teal-dim:#63501f;}
+
+/* mythical theme flourish: adds a subtle animated glow to primary buttons/current path nodes */
+body.theme-mythical-fx .btn-primary,
+body.theme-mythical-fx .hex-btn.open{
+  animation: mythical-pulse 2.4s ease-in-out infinite;
+}
+@keyframes mythical-pulse{
+  0%,100%{ box-shadow: 0 0 0 0 rgba(239,111,108,.35); }
+  50%{ box-shadow: 0 0 14px 3px rgba(239,111,108,.35); }
+}
+
+/* ==================== Facet filters (Practice page) ==================== */
+.facet-bar{
+  display:flex;gap:8px;padding:0 18px 10px;flex-wrap:wrap;
+}
+.facet-btn{
+  padding:8px 12px;border-radius:100px;
+  border:1px solid var(--line);background:var(--bg-elev);
+  color:var(--text-dim);font-size:12.5px;font-weight:700;
+  display:inline-flex;align-items:center;gap:2px;
+}
+.facet-btn.has-value{border-color:var(--teal);color:var(--teal);}
+.facet-btn.active{background:var(--teal);color:#0b1f1c;border-color:var(--teal);}
+.facet-btn.clear{color:var(--coral);border-color:transparent;background:none;}
+.facet-panel{
+  display:flex;flex-wrap:wrap;gap:8px;
+  padding:2px 18px 16px;
+}
+
+/* ==================== Combo banner, XP bar, achievements ==================== */
+.combo-banner{
+  margin:4px 0 14px;padding:10px 14px;border-radius:10px;
+  background:rgba(242,184,75,.12);border:1px solid rgba(242,184,75,.35);
+  color:var(--amber);font-weight:800;font-size:13.5px;text-align:center;
+}
+.xp-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.xp-level-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  background:var(--violet);color:#fff;font-weight:800;font-size:12px;
+  padding:3px 10px;border-radius:100px;
+}
+.badge-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.badge-card{
+  background:var(--bg-elev);border:1px solid var(--line);border-radius:var(--radius-sm);
+  padding:12px 8px;text-align:center;
+}
+.badge-card.locked{opacity:.4;}
+.badge-icon{font-size:26px;margin-bottom:6px;}
+.badge-name{font-size:11px;font-weight:700;line-height:1.3;}
+
+/* ==================== Big correct/incorrect icon badge (accessibility: not color-only) ==================== */
+.feedback-icon-badge{
+  width:40px;height:40px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;font-size:20px;font-weight:900;
+}
+.feedback-icon-badge.correct{background:rgba(92,214,138,.18);color:var(--green);}
+.feedback-icon-badge.wrong{background:rgba(239,111,108,.18);color:var(--coral);}
+.feedback-head-row{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+
+/* ==================== Skeleton loader (shown before JS finishes init) ==================== */
+.skeleton-loader{padding:20px 18px;}
+.skeleton-bar, .skeleton-hex{
+  background:linear-gradient(90deg, var(--bg-elev) 25%, var(--bg-elev-2) 37%, var(--bg-elev) 63%);
+  background-size:400% 100%;
+  animation: skeleton-pulse 1.4s ease infinite;
+}
+.skeleton-bar{border-radius:8px;}
+.skeleton-hex{
+  width:84px;height:76px;margin:0 auto;
+  clip-path:polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+@keyframes skeleton-pulse{
+  0%{background-position:100% 50%;}
+  100%{background-position:0% 50%;}
+}
+
+/* ==================== Layered avatar: body + outfit + hair (no face, per request) ==================== */
+.avatar-clip{
+  width:100%;height:100%;border-radius:50%;overflow:hidden;position:relative;
+}
+.avatar-outfit{position:absolute;left:0;right:0;bottom:0;height:38%;}
+.avatar-outfit-none{display:none;}
+.avatar-outfit-crew{clip-path:polygon(18% 100%, 18% 42%, 50% 20%, 82% 42%, 82% 100%);}
+.avatar-outfit-hoodie{height:48%;clip-path:polygon(8% 100%, 8% 34%, 50% 8%, 92% 34%, 92% 100%);}
+.avatar-outfit-collar{clip-path:polygon(18% 100%, 18% 42%, 50% 20%, 82% 42%, 82% 100%);}
+.avatar-outfit-collar::after{
+  content:'';position:absolute;top:20%;left:42%;width:16%;height:22%;
+  background:var(--bg-elev);clip-path:polygon(0 0, 100% 0, 50% 100%);
+}
+.avatar-outfit-cape{clip-path:polygon(0% 100%, 14% 28%, 50% 12%, 86% 28%, 100% 100%);}
+
+/* --- Dress & kimono/yukata (built as parent + child sash, like the compound hair styles) --- */
+.avatar-outfit-dress{height:56%;
+  clip-path:polygon(32% 0%, 68% 0%, 84% 22%, 100% 100%, 0% 100%, 16% 22%);
+}
+.outfit-part{position:absolute;}
+.outfit-waistline{left:14%;right:14%;top:46%;height:5%;border-radius:3px;opacity:.55;}
+.avatar-outfit-kimono{height:58%;
+  clip-path:polygon(14% 0%, 86% 0%, 96% 100%, 54% 34%, 46% 100%, 4% 100%);
+}
+.outfit-obi{left:22%;right:22%;top:48%;height:14%;border-radius:2px;}
+
+.avatar-hair{position:absolute;top:0;left:0;right:0;}
+.avatar-hair-none{display:none;}
+.avatar-hair-short{height:30%;clip-path:ellipse(56% 100% at 50% 0%);}
+.avatar-hair-long{height:78%;left:-6%;right:-6%;clip-path:polygon(10% 0%, 90% 0%, 100% 42%, 88% 100%, 74% 58%, 26% 58%, 12% 100%, 0% 42%);}
+.avatar-hair-mohawk{width:16%;left:42%;height:56%;clip-path:polygon(50% 0%, 100% 100%, 0% 100%);}
+.avatar-hair-curly{height:30%;top:2%;left:50%;width:22%;border-radius:50%;transform:translateX(-50%);
+  box-shadow: -20px 6px 0 -2px currentColor, 20px 6px 0 -2px currentColor, -10px -6px 0 -4px currentColor, 10px -6px 0 -4px currentColor;
+  color:inherit;
+}
+
+/* --- New shapes, inspired by reference hairstyle sheets (abstract, faceless) --- */
+.avatar-hair-wavy{height:74%;left:-8%;right:-8%;
+  clip-path:polygon(12% 0%, 88% 0%, 100% 38%, 92% 55%, 100% 72%, 84% 100%, 74% 62%, 60% 100%, 50% 60%, 40% 100%, 26% 62%, 16% 100%, 8% 72%, 0% 38%);
+}
+.avatar-hair-undercut{height:26%;clip-path:polygon(30% 0%, 70% 0%, 78% 100%, 22% 100%);}
+
+/* Compound styles (ponytail/bun/twintails/braid) are built from real sibling
+   parts in avatarRender.js, NOT ::before/::after — a clip-path on a parent
+   also clips its pseudo-elements, which was hiding the tails entirely. */
+.avatar-hair-ponytail,
+.avatar-hair-bun,
+.avatar-hair-twintails,
+.avatar-hair-braid{height:100%;}
+.hair-part{position:absolute;}
+.hair-cap{top:0;left:0;right:0;height:100%;clip-path:ellipse(56% 30% at 50% 0%);}
+.hair-tail{border-radius:0 0 60% 60%;box-shadow:2px 0 0 0 rgba(0,0,0,.12);}
+.hair-tail-right{top:16%;right:8%;width:15%;height:46%;transform:rotate(14deg);}
+.hair-tail-left-tt{top:10%;left:-2%;width:16%;height:48%;transform:rotate(-22deg);}
+.hair-tail-right-tt{top:10%;right:-2%;width:16%;height:48%;transform:rotate(22deg);}
+.hair-tail-center{top:18%;left:41%;width:16%;height:52%;border-radius:0 0 40% 40%;
+  box-shadow: inset 0 9px 0 -6px rgba(0,0,0,.3), inset 0 20px 0 -6px rgba(0,0,0,.3), inset 0 31px 0 -6px rgba(0,0,0,.3), inset 0 42px 0 -6px rgba(0,0,0,.3);
+}
+.hair-bun-circle{top:-6%;left:50%;width:24%;height:24%;border-radius:50%;transform:translateX(-50%);
+  box-shadow:inset -3px -3px 0 -1px rgba(0,0,0,.15);
+}

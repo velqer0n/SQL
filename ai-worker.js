@@ -1,4 +1,4 @@
-// Cloudflare Worker: shared proxy for the Bugsy AI assistant.
+// Cloudflare Worker: shared proxy for the Индекс AI assistant.
 //
 // Why this exists: QueryPath is a static site (GitHub Pages), so it can't
 // safely hold a secret API key in the browser. This tiny Worker holds the
